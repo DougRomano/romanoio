@@ -1,0 +1,2 @@
+# Redirect default Netlify subdomain to primary domain
+https://modest-benz-a39abc.netlify.com/* https://romano.io/:splat 301!
