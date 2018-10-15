@@ -7,4 +7,6 @@ excerpt: "Fixing the terminal history command"
 ---
 
 #ARRRROOOOOOOOO
-I rely on the history command heavly during my day to day coding tasks.
+I rely on the history command heavly during my day to day coding tasks.  
+
+History with closing the terminal.
