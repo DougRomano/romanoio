@@ -1,10 +1,18 @@
 module.exports = {
   siteMetadata: {
-    title: 'Gatsby Default Starter',
+    title: 'RomanoIO',
   },
   plugins: [
-    'gatsby-plugin-netlify-cms',
-    'gatsby-plugin-react-helmet',
+    `gatsby-plugin-netlify-cms`,
+    `gatsby-transformer-remark`,
+    {
+      resolve: `gatsby-source-filesystem`,
+      options: {
+        path: `${__dirname}/src/pages`,
+        name: 'pages',
+      },
+    },
+    `gatsby-plugin-react-helmet`,
     {
       resolve: `gatsby-plugin-manifest`,
       options: {
