@@ -10,3 +10,5 @@ excerpt: "Fixing the terminal history command"
 I rely on the history command heavly during my day to day coding tasks.  
 
 History with closing the terminal.
+
+Expand duplicates
