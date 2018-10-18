@@ -16,3 +16,5 @@ Expand number of entries
 Distinct dups.
 
 Save entries without closing editor
+
+Bash Sessions.
