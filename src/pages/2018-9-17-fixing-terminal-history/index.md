@@ -14,7 +14,3 @@ History with closing the terminal.
 Expand number of entries
 
 Distinct dups.
-
-
-
-
