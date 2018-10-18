@@ -14,3 +14,5 @@ History with closing the terminal.
 Expand number of entries
 
 Distinct dups.
+
+Save entries without closing editor
