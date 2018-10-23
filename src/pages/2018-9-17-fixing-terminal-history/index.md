@@ -32,3 +32,6 @@ Here are a few items that are worth changing
 
 I believe these standards go far back and may been been initially implemented for computers with limited resources, and most likely only one at a time. Aside from the history, changing the defaults are quick and easy.
 
+
+
+
