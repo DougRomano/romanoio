@@ -9,7 +9,7 @@ export default function Footer() {
           <Link href="https://github.com/DougRomano" target="_blank" rel="noopener noreferrer" className="hover:text-gray-900 dark:hover:text-white transition-colors">
             GitHub
           </Link>
-          <Link href="https://linkedin.com/in/dougromano" target="_blank" rel="noopener noreferrer" className="hover:text-gray-900 dark:hover:text-white transition-colors">
+          <Link href="https://www.linkedin.com/in/doug-romano-72108115/" target="_blank" rel="noopener noreferrer" className="hover:text-gray-900 dark:hover:text-white transition-colors">
             LinkedIn
           </Link>
           <Link href="/blog" className="hover:text-gray-900 dark:hover:text-white transition-colors">
