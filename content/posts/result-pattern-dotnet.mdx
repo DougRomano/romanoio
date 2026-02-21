@@ -1,0 +1,221 @@
+---
+title: "Ditching Exceptions for the Result Pattern in .NET"
+date: "2025-01-20"
+excerpt: "Exceptions are the wrong tool for expected failures. The Result pattern makes error paths explicit, composable, and testable — here's how I use it in C#."
+tags: [".NET", "C#", "Architecture", "Patterns"]
+---
+
+Exceptions are for exceptional things. Network partitions. Disk full. Null dereferences
+you genuinely didn't see coming. They are *not* for "this email is already taken" or
+"the order is past the cancellation window."
+
+When expected failures flow through exceptions, you get:
+- **Invisible error paths** — callers have no idea what can go wrong without reading the implementation
+- **Control flow through side channels** — try/catch scattered through your call stack
+- **Expensive allocations** — exceptions capture a stack trace on construction
+
+The Result pattern fixes this. Here's how I implement and use it in C#.
+
+## The type
+
+There are libraries for this (`FluentResults`, `ErrorOr`, `LanguageExt`), but I usually
+start with a minimal hand-rolled version. Less ceremony, easy to own:
+
+```csharp
+public class Result<T>
+{
+    public bool IsSuccess { get; }
+    public T? Value { get; }
+    public string? Error { get; }
+
+    private Result(T value)
+    {
+        IsSuccess = true;
+        Value = value;
+    }
+
+    private Result(string error)
+    {
+        IsSuccess = false;
+        Error = error;
+    }
+
+    public static Result<T> Ok(T value) => new(value);
+    public static Result<T> Fail(string error) => new(error);
+}
+
+// Non-generic variant for void operations
+public class Result
+{
+    public bool IsSuccess { get; }
+    public string? Error { get; }
+
+    private Result(bool success, string? error)
+    {
+        IsSuccess = success;
+        Error = error;
+    }
+
+    public static Result Ok() => new(true, null);
+    public static Result Fail(string error) => new(false, error);
+}
+```
+
+Simple. No magic, no source generators, no reflection.
+
+## Using it in a service
+
+Here's a domain operation with explicit failure modes:
+
+```csharp
+public class OrderService
+{
+    private readonly IOrderRepository _orders;
+    private readonly IClock _clock;
+
+    public OrderService(IOrderRepository orders, IClock clock)
+    {
+        _orders = orders;
+        _clock = clock;
+    }
+
+    public async Task<Result> CancelOrderAsync(int orderId, int requestingUserId)
+    {
+        var order = await _orders.FindAsync(orderId);
+
+        if (order is null)
+            return Result.Fail($"Order {orderId} not found.");
+
+        if (order.OwnerId != requestingUserId)
+            return Result.Fail("You don't have permission to cancel this order.");
+
+        if (order.Status == OrderStatus.Shipped)
+            return Result.Fail("Shipped orders cannot be cancelled.");
+
+        if (_clock.UtcNow - order.PlacedAt > TimeSpan.FromHours(24))
+            return Result.Fail("Orders older than 24 hours cannot be cancelled.");
+
+        order.Cancel();
+        await _orders.SaveAsync(order);
+        return Result.Ok();
+    }
+}
+```
+
+Every failure path is a named, explicit branch — no exception catching needed at the
+call site.
+
+## The controller layer
+
+The Result maps cleanly to HTTP responses:
+
+```csharp
+[HttpDelete("{orderId:int}")]
+public async Task<IActionResult> CancelOrder(int orderId)
+{
+    var result = await _orderService.CancelOrderAsync(orderId, CurrentUserId);
+
+    return result.IsSuccess
+        ? NoContent()
+        : BadRequest(new { error = result.Error });
+}
+```
+
+You can make this even more concise with a small extension:
+
+```csharp
+public static IActionResult ToActionResult(this Result result) =>
+    result.IsSuccess
+        ? new NoContentResult()
+        : new BadRequestObjectResult(new { error = result.Error });
+```
+
+## Making it composable with Map and Bind
+
+The real power comes when you chain operations. Add a couple of functional combinators:
+
+```csharp
+public class Result<T>
+{
+    // ... (previous code)
+
+    public Result<TOut> Map<TOut>(Func<T, TOut> transform) =>
+        IsSuccess ? Result<TOut>.Ok(transform(Value!)) : Result<TOut>.Fail(Error!);
+
+    public async Task<Result<TOut>> MapAsync<TOut>(Func<T, Task<TOut>> transform) =>
+        IsSuccess ? Result<TOut>.Ok(await transform(Value!)) : Result<TOut>.Fail(Error!);
+
+    public Result<TOut> Bind<TOut>(Func<T, Result<TOut>> next) =>
+        IsSuccess ? next(Value!) : Result<TOut>.Fail(Error!);
+}
+```
+
+Now you can chain operations without nested if-checks:
+
+```csharp
+var result = await _userRepo.FindByEmailAsync(email)          // Result<User>
+    .MapAsync(user => _tokenService.GenerateToken(user))      // Result<string>
+    .MapAsync(token => new LoginResponse { Token = token });  // Result<LoginResponse>
+```
+
+If any step fails, the error short-circuits through the chain. The happy path reads
+linearly.
+
+## Richer errors
+
+Once you're hooked on the pattern, you'll want typed errors instead of raw strings —
+especially when the caller needs to differentiate between "not found" and "unauthorized":
+
+```csharp
+public abstract record AppError(string Message);
+public record NotFoundError(string Message) : AppError(Message);
+public record ValidationError(string Message) : AppError(Message);
+public record ForbiddenError(string Message) : AppError(Message);
+
+public class Result<T>
+{
+    public bool IsSuccess { get; }
+    public T? Value { get; }
+    public AppError? Error { get; }
+    // ...
+}
+```
+
+Map these in your controller with a simple switch:
+
+```csharp
+return result.Error switch
+{
+    NotFoundError e  => NotFound(new { error = e.Message }),
+    ForbiddenError e => Forbid(),
+    ValidationError e => UnprocessableEntity(new { error = e.Message }),
+    _                => StatusCode(500)
+};
+```
+
+Clean, exhaustive, no string parsing.
+
+## When to still use exceptions
+
+The Result pattern isn't a replacement for all exceptions — only for **expected,
+domain-level failures**:
+
+| Use Result for | Still throw exceptions for |
+|---|---|
+| Business rule violations | Infrastructure failures (DB down, network timeout) |
+| Validation errors | Programming errors (null ref, index out of bounds) |
+| "Not found" in queries | Configuration missing at startup |
+| Permission checks | Truly unexpected states |
+
+Exceptions across infrastructure boundaries are fine — let them bubble up to middleware
+that logs and returns a 500. Don't `try/catch` EF Core `DbUpdateException` unless you
+have something specific to do with it.
+
+---
+
+The core insight: the type system is your documentation. When a method returns
+`Task<Result<Order>>`, any competent developer reading that signature knows the
+operation can fail in a handled way. When it returns `Task<Order>`, they can only
+hope the exceptions are documented somewhere.
+
+Make the contract explicit. Future-you will be grateful.

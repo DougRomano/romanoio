@@ -1,0 +1,147 @@
+---
+title: "SQL Index Tuning: The Fundamentals I Keep Coming Back To"
+date: "2025-02-15"
+excerpt: "After years of chasing slow queries, most of the wins come down to a handful of indexing patterns. Here's the mental model I use every time."
+tags: ["SQL", "Performance", "SQL Server"]
+---
+
+Every time I inherit a slow application, I start the same way: I open Query Store,
+sort by average CPU, and look at the top 10 offenders. Nine times out of ten, the
+fix is an index. But "add an index" is deceptively simple advice — the *which*, *where*,
+and *why* of it takes years to internalize.
+
+Here's the mental model I've landed on.
+
+## Why indexes get misunderstood
+
+The naive take is that indexes are just magic speed-up things. Slap one on the column
+you're filtering and you're done. That works — until it doesn't.
+
+The real picture: an index is a sorted copy of (part of) your data, stored separately,
+maintained on every write. You're trading **write overhead and storage** for **read speed**.
+That trade-off has to be deliberate.
+
+## The three questions
+
+Before creating any index, I ask:
+
+1. **What queries will benefit?** (Look at actual execution plans, not guesses)
+2. **How does the table get written to?** (Write-heavy tables pay a higher index tax)
+3. **Is there an existing index I can extend instead?** (Covering a nearby query is often cheaper than a new index)
+
+## Clustered vs. non-clustered
+
+SQL Server tables have exactly **one clustered index** — this *is* the table, physically
+ordered by those key columns. Everything else is a non-clustered index, which stores
+the indexed columns plus a pointer back to the clustered row.
+
+```sql
+-- The clustered index is usually your primary key
+-- Choose it for range scans, not just point lookups
+CREATE TABLE Orders (
+    OrderId     INT IDENTITY(1,1) PRIMARY KEY,   -- clustered by default
+    CustomerId  INT NOT NULL,
+    OrderDate   DATETIME2 NOT NULL,
+    Status      TINYINT NOT NULL
+);
+```
+
+If you're doing a lot of `WHERE OrderDate BETWEEN @start AND @end`, clustering on
+`OrderDate` might outperform clustering on an identity column. This is the kind of
+decision that's easy to get wrong at schema design time and expensive to change later.
+
+## The seek vs. scan distinction
+
+The most important thing to internalize from an execution plan:
+
+- **Index Seek** → SQL Server jumped directly to the rows. Good.
+- **Index Scan** → SQL Server read the whole (or most of the) index. Often bad.
+
+A scan on a small table is fine. A scan on a 50M-row table is a full table read, even
+if it's going through a non-clustered index.
+
+**Selective predicates** (high cardinality columns like `OrderId`, `Email`) produce
+seeks. Non-selective predicates (`Status IN (1,2)` on a column with three values) often
+produce scans regardless of indexing.
+
+## Covering indexes are underused
+
+A covering index includes all the columns a query needs, so SQL Server never has to
+look up the base table row (called a **key lookup**). Key lookups are the silent killers —
+they look small in the plan but explode under load.
+
+```sql
+-- Query that frequently runs:
+SELECT OrderId, OrderDate, Status
+FROM Orders
+WHERE CustomerId = @customerId
+  AND Status = 1;
+
+-- Covering index: key column first, then INCLUDE the rest
+CREATE INDEX IX_Orders_Customer_Status
+    ON Orders (CustomerId, Status)
+    INCLUDE (OrderId, OrderDate);
+```
+
+The rule of thumb: **filter and sort columns go in the key; all other needed columns go
+in INCLUDE**.
+
+## Column order in composite indexes
+
+Column order matters — a lot. SQL Server can use a composite index for a query only if
+the **leading edge** (leftmost key columns) is referenced.
+
+```sql
+-- Index on (CustomerId, OrderDate)
+-- ✅ Used: WHERE CustomerId = 1
+-- ✅ Used: WHERE CustomerId = 1 AND OrderDate > '2024-01-01'
+-- ❌ NOT used: WHERE OrderDate > '2024-01-01'  (skips leading column)
+```
+
+This is the "leftmost prefix" rule. It's why you sometimes see an index on `(A, B)` and
+another on `(B)` for the same table — they serve different query shapes.
+
+## Filtered indexes: an underrated tool
+
+If a large percentage of your queries filter on the same subset (e.g., only active
+records), a filtered index can be dramatically smaller and faster than a full index:
+
+```sql
+-- 98% of reads are on active orders only
+CREATE INDEX IX_Orders_Active
+    ON Orders (OrderDate, CustomerId)
+    WHERE Status = 1;
+```
+
+The index is only built over rows where `Status = 1`. Smaller index, better cache
+utilization, faster seeks.
+
+Caveat: the query's WHERE clause has to match the filter predicate *exactly* for the
+optimizer to consider it.
+
+## How I investigate a slow query
+
+1. **Get the actual execution plan** (`SET STATISTICS IO, TIME ON` or SSMS / Azure Data Studio)
+2. Find the **most expensive operator** (fat arrows in the plan, high estimated rows vs. actual rows mismatch)
+3. Look for **key lookups** — almost always worth eliminating with INCLUDE columns
+4. Look for **table scans** — is the predicate selective enough for an index to help?
+5. Check **missing index hints** in the plan — they're a suggestion, not gospel, but worth considering
+6. Verify with `sys.dm_exec_query_stats` or Query Store whether the query improved after the change
+
+## The thing nobody tells you
+
+Indexes don't just slow down writes — they also consume buffer pool cache. An
+over-indexed table might be reading fast in dev (warm cache, small data volume) and
+slow in prod (cold cache, 200 million rows fighting for buffer pool space with your
+expensive indexes).
+
+Index tuning is a practice, not a one-time fix. Check usage with
+`sys.dm_db_index_usage_stats` periodically and drop indexes that haven't been used
+since the last service restart. Unused indexes are write overhead with zero read benefit.
+
+---
+
+Got a query that's still slow after indexing? Most of the time it's one of three
+things: statistics are stale (run `UPDATE STATISTICS`), the query is parameterized
+poorly (parameter sniffing), or the shape of the query prevents seeks (implicit
+conversions, functions on columns). Those are posts for another day.
