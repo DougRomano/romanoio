@@ -1,0 +1,60 @@
+---
+title: "Your Tech Debt Has a New Co-Author"
+date: "2026-02-12"
+excerpt: "AI doesn't introduce bad patterns into your codebase. It amplifies the ones that are already there — at machine speed."
+tags: ["AI", "Code Quality", "Software Architecture", ".NET", "Developer Productivity"]
+---
+
+AI doesn't introduce bad patterns into your codebase. It amplifies the ones that are already there.
+
+This is the thing that's not getting talked about in the AI developer productivity conversation. Everyone is measuring velocity. Lines of code per day, features shipped per sprint, time from ticket to deploy. The metrics look great. And underneath them, quietly, something is accumulating.
+
+## The Model Mirrors Your Codebase
+
+When you point an AI agent at a production system, you're not adding something neutral to the mix. You're adding a pattern-recognition engine that will learn everything your codebase is doing — intentional or not — and continue doing it.
+
+I work in .NET systems that have history. Decisions made five years ago by developers who are long gone. Business logic that migrated from services into controllers when a deadline was close. Abstractions that made sense in one context and calcified into obstacles in three others. Every codebase has this. It's not a failure. It's entropy.
+
+The AI agent doesn't see entropy. It sees examples. And it follows them.
+
+Point it at a system where domain logic routinely leaks into controllers, and it will write domain logic in controllers — because that's the dominant pattern in the context window. Ask it to add a new service in a codebase where half the services do too much, and it will happily write you another one that does too much. It's not making a mistake. It's doing exactly what you trained it to do by showing it a thousand examples of what "normal" looks like in your system.
+
+## Traditional Debt Compounds. AI Debt Compounds Faster.
+
+The old way tech debt accumulated had natural friction. A developer made a questionable call. Someone else pushed back in review. Or didn't, because it was Friday. One bad pattern per decision. Spread across weeks and months. Slow enough that you could see it coming if you were paying attention.
+
+AI-assisted development removes most of that friction. You can scaffold a new module in fifteen minutes. Add ten endpoints before lunch. The agent writes five hundred lines that all follow the same architectural pattern — whatever pattern it learned from the files you opened at the start of the session.
+
+If those files show clean, intentional architecture, you get clean, intentional output at velocity. If those files show five years of accumulated shortcuts, you get five years of accumulated shortcuts reproduced at velocity.
+
+Speed is a multiplier. It multiplies both directions.
+
+## What I've Watched Happen in Production
+
+A .NET system I know well had a long-standing pattern: business rules scattered across the API layer. Not intentionally. Just the way things went when features got added fast and refactoring kept getting deferred. The system worked. It wasn't pretty, but it worked.
+
+When the team started leaning into AI-assisted development, output went up significantly. Tickets closed faster. Features shipped quicker. For about six weeks, everything looked great.
+
+Then they started a larger feature that touched multiple parts of the system and realized the new code was more tightly coupled to the API layer than anything they'd written in years. The AI hadn't invented a new problem. It had inherited the old one and applied it consistently to every new file it touched — no hesitation, no second-guessing, no "are you sure you want to do it this way?"
+
+The code reviewed fine in isolation. The pattern only became visible at scale.
+
+## Your CLAUDE.md Is an Architecture Contract
+
+The answer isn't slower adoption. The developers who pump the brakes on AI tooling don't solve this problem — they just accumulate the same debt on a slower timeline.
+
+The answer is explicitness. Your CLAUDE.md isn't just a productivity tool. It's an architecture contract. It's where you tell the agent what your codebase *aspires* to be, not just what it currently is.
+
+That means documenting the patterns you want, but also the ones you don't. Not "follow clean architecture" — the model has read a thousand articles about clean architecture and will nod along while putting logic in your controllers. Specific. "Business rules live in the domain layer. The API layer handles HTTP concerns only. If you're writing business logic in a controller, stop and ask." That kind of explicit.
+
+Every anti-pattern your system has accumulated is now a risk surface. The agent will find it, recognize it as a pattern, and propagate it unless you tell it not to. The CLAUDE.md is where you draw that line.
+
+Version it. Review it. Put it through the same SDLC as your production code. Because at the velocity AI enables, your architectural guardrails are doing more work than they've ever done before.
+
+## The Debt Is Already Being Written
+
+The developers who are going to drown in AI-generated tech debt aren't the slow adopters. They're the fast ones who never stopped to steer.
+
+Shipping fast matters. It's one of the genuine advantages AI tooling gives you, and you should use it. But the codebase you're shipping into has a gravity. Left unmanaged, your agent will follow it. Every time. Without complaint. At whatever speed you give it.
+
+Your tech debt has a new co-author. Make sure you're both working from the same blueprint.
