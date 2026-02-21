@@ -1,0 +1,54 @@
+---
+title: "Most of the Code AI Learned From Is Garbage"
+date: "2026-02-12"
+excerpt: "Here's the thing nobody tells you when you start using AI coding agents: they trained on the internet. And most of the code on the internet is terrible. My job is to make sure it doesn't write like that for me."
+tags: ["AI", "Code Quality", ".NET", "Software Architecture", "Developer Productivity"]
+---
+
+Here's the thing nobody tells you when you start using AI coding agents: they trained on the internet. And most of the code on the internet is terrible.
+
+Stack Overflow answers from 2014. Over-engineered open source projects. Tutorial code that was never meant to run in production. Dependency-bloated repos where someone pulled in pandas to calculate an average of three numbers.
+
+If you just let Claude Code rip on a greenfield project with no guardrails, it will happily reproduce every bad pattern it's ever seen. It will add dependencies you don't need. It will containerize things that don't need containers. It will architect your weekend prototype like it's preparing for Netflix-scale traffic.
+
+My approach is the opposite, and it's why I think I get dramatically better results than most.
+
+## Start Slow to Go Fast
+
+I start every AI-assisted project slower than most people expect. The first phase is almost entirely teaching. Not teaching Claude Code about the domain—teaching it what my standards look like.
+
+I write the first patterns by hand (or with heavy guidance). I critique everything it gives back. I reject the popular-but-wrong choices. I explain why I want it done differently, and I make it redo it until it internalizes the pattern.
+
+This drives some people crazy. They want to see features shipping on day one. But here's what happens once Claude Code has enough examples of good patterns in our shared codebase: it starts writing software that is an extension of my own mind.
+
+At that point, a design change is a few messages away from being real. Not because the AI got smarter—because I took the time to teach it what "good" means in this specific context.
+
+## The Patterns I Kill on Sight
+
+Left unchecked, AI agents will reach for whatever is most represented in their training data. That means:
+
+**Unnecessary dependencies.** No, we don't need pandas for this. We don't need GraphQL when REST is fine. We don't need Spark when a SQL query will do. Every dependency is a liability. If the standard library can handle it, the standard library handles it.
+
+**Premature infrastructure.** Don't containerize it. Don't Kubernetes it. Don't split it into microservices. We are not optimizing for scale before we've proven the product has value. Build something that fits entirely in my head so that any design change is a conversation, not a migration.
+
+**Complexity worship.** The AI will happily add three layers of abstraction where one would do. It will introduce design patterns that sound impressive in a blog post but make the code harder to change. My job is to keep asking: does this make the system simpler or just more "architected"?
+
+## The Architect's Job Is Now Criticism
+
+My role has shifted. I'm not writing code. I'm constantly criticizing how the AI writes code—until it almost never writes something I'd reject.
+
+That's the inflection point. When you've been specific enough about your standards, when you've built up enough examples of the right patterns in your codebase, the AI starts producing work that genuinely reflects your architectural judgment. Not generic "best practices." Your judgment. For this project.
+
+The product should fit entirely in your mind. You should be able to explain every decision. You should be able to defend the architecture to anyone who asks. If you can't, you're not using AI effectively—you're outsourcing your judgment.
+
+## The Trainwreck Coming for "Features First" Teams
+
+If your AI process involves rarely looking at the code and just focusing on working features, you are heading for a trainwreck.
+
+You'll end up with software you can't explain and can't defend. It might demo well. It might even pass tests. But when you try to put it into production in the real world—when you need to debug it at 2 AM, when a client asks why it handles edge cases the way it does, when a new team member needs to understand the design—you will find yourself in a world of trouble.
+
+The people getting the best results from AI are the ones who are pickiest about what it produces. Not the ones who accept the most output.
+
+Slow at the start. Relentless about standards. Absolutely unforgiving about unnecessary complexity. That's the approach.
+
+The AI doesn't know what good software looks like. That's still your job.

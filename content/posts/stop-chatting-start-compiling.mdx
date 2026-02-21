@@ -1,0 +1,56 @@
+---
+title: "Stop Chatting with Your LLM. Start Compiling."
+date: "2026-02-16"
+excerpt: "Anthropic just shipped Programmatic Tool Calling — the feature that makes traditional tool calling look like dial-up. 37% fewer tokens. 13% higher accuracy. And a fundamentally different architecture."
+tags: ["AI", "Agentic Development", "Anthropic", ".NET", "Software Architecture"]
+---
+
+Here's what traditional AI tool calling looks like: the model needs data from three sources. It makes a tool call. Waits for the result. Reads the result. Makes another tool call. Waits. Reads. Makes a third. Waits. Reads. Three full inference passes. Three round trips. Every intermediate result stuffed into the context window whether you need it or not.
+
+Now here's what Anthropic just shipped with Programmatic Tool Calling: the model writes a Python script in one pass that calls all three tools, filters the results, aggregates the data, and returns only what matters. One inference pass. One script. Deterministic execution. Only stdout comes back.
+
+37% fewer tokens. 13% higher accuracy. And a fundamental shift in how we should think about AI agents.
+
+## The LLM Is a Compiler
+
+This is the mental model that changed everything for me. Stop thinking of the LLM as a chat partner. Think of it as a compiler.
+
+A compiler takes high-level intent and produces executable instructions. That's exactly what's happening here. You describe what you need. The model compiles that into a Python script—a real, testable, deterministic artifact. The script executes at machine speed. Only the final output returns to the model.
+
+The inference happens at roughly 3,000 tokens per second. The compiled script executes at MHz. The results flow back at GHz. You're moving the expensive work (inference) into a single pass and letting cheap, deterministic computation handle the rest.
+
+This isn't an optimization. It's a different architecture entirely.
+
+## The Chat Loop Is Technical Debt
+
+If you've built anything with AI agents, you know the pain. You wire up five MCP servers—that's 58 tools consuming roughly 55,000 tokens before the conversation even starts. Add Jira, add your internal APIs, and you're approaching 100,000 tokens of overhead just in tool definitions.
+
+Then the agent starts working. Every tool call is a full inference pass. Every intermediate result gets crammed into context. The context window bloats. Costs climb. Latency compounds. And somewhere around the fourth or fifth round trip, the model starts losing track of what it was doing in the first place.
+
+I've watched this happen in production .NET systems. The agent calls your SQL Server, gets a result set, reads the entire thing back into context, decides it needs another query, makes another call, reads another result set. By the time it's done, you've burned through tokens reading data that a simple WHERE clause could have filtered out.
+
+The chat loop is the new technical debt. We just haven't had a name for it until now.
+
+## Compiled Cognitive Functions
+
+Programmatic Tool Calling flips the model. Instead of the LLM orchestrating tool calls one at a time through natural language, it emits a script that handles the orchestration deterministically. The script can chain calls, filter results, handle errors, transform data—all inside a sandboxed execution environment.
+
+Think about what that means for a .NET architect designing agent workflows. Instead of hoping the model makes the right sequence of API calls through iterative prompting, you get a compiled cognitive function—a testable artifact that does exactly what it's supposed to do, every time.
+
+You can inspect it. You can unit test it. You can version it. You can review it in a PR. It's code, not vibes.
+
+And the model only sees the stdout—the final, filtered, relevant result. Not the raw database dump. Not the intermediate API responses. Not the noise. Just the signal.
+
+## The New Design Principle
+
+Compile as much as possible. Leave as little as possible to non-deterministic inference loops.
+
+That's the principle I'm applying to every agent workflow I build now. Every time I'm about to let the model make a series of tool calls through natural language, I ask: could this be a single compiled pass instead? Could the model emit a script that handles the orchestration, and I just get the result?
+
+Nine times out of ten, the answer is yes. And when it is, you get faster execution, lower costs, more predictable behavior, and artifacts you can actually test and debug.
+
+This is what separates developers who are using AI tools from developers who are engineering with them. The chat loop feels natural. It's the first thing everyone builds. But it's the training wheels. The compiled approach is where the real leverage lives.
+
+Not chat loops. Compilation.
+
+Not vibes. Receipts.
