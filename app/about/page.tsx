@@ -13,17 +13,18 @@ export default function AboutPage() {
 
         <div className="prose prose-gray dark:prose-invert prose-a:text-accent-600 dark:prose-a:text-accent-400">
           <p>
-            Hey, I&apos;m <strong>Doug Romano</strong>. I&apos;ve spent the last 20+ years building
-            software with the .NET stack — C#, SQL Server, Azure, distributed systems, the works.
-            That background matters, but it&apos;s not the current story.
+            Hey, I&apos;m <strong>Doug Romano</strong> — a software architect based in
+            St. Louis, Missouri. I&apos;ve spent the last 25+ years building software with the
+            .NET stack — C#, SQL Server, Azure, distributed systems, the works. That background
+            matters, but it&apos;s not the current story.
           </p>
 
           <p>
             The current story is AI. Specifically, what it actually looks like when you stop
             treating AI as a productivity tool and start treating it as the primary way you build
-            software. I cancelled my JetBrains subscription after 19 years. I haven&apos;t typed
-            production code by hand in months. I build with Claude Code and agentic workflows every
-            day — not to chase trends, but because the results are undeniable.
+            software. I haven&apos;t typed production code by hand in months. I build with Claude
+            Code and agentic workflows every day — not to chase trends, but because the results
+            are undeniable.
           </p>
 
           <p>
@@ -63,7 +64,9 @@ export default function AboutPage() {
             >
               GitHub
             </a>
-            . If something I wrote is wrong, pull requests are welcome.
+            . If something I wrote is wrong, pull requests are welcome. You can also
+            reach me directly at{' '}
+            <span className="font-mono text-gray-700 dark:text-gray-300">doug@romano.io</span>.
           </p>
 
           <hr className="border-gray-200 dark:border-gray-700" />
