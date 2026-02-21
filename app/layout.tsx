@@ -5,20 +5,29 @@ import Footer from '@/components/Footer';
 
 export const metadata: Metadata = {
   title: {
-    default: 'Doug Romano — .NET & SQL Architect',
+    default: 'Doug Romano — AI-First Developer & .NET Architect',
     template: '%s | romano.io',
   },
   description:
-    'Thoughts on .NET architecture, SQL, distributed systems, and software engineering from Doug Romano.',
+    'Writing honestly about AI agents, Claude Code, agentic workflows, and 25+ years of .NET in production. By Doug Romano, St. Louis.',
   metadataBase: new URL('https://romano.io'),
   openGraph: {
     type: 'website',
     locale: 'en_US',
     url: 'https://romano.io',
     siteName: 'romano.io',
+    images: [
+      {
+        url: '/og-thumbnail.png',
+        width: 1200,
+        height: 630,
+        alt: 'romano.io — AI-First Developer. 20 Years of .NET Behind It.',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
+    images: ['/og-thumbnail.png'],
   },
   robots: {
     index: true,
