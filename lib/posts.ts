@@ -12,6 +12,7 @@ export interface PostMeta {
   excerpt: string;
   tags: string[];
   readingTime: string;
+  image?: string;
   draft?: boolean;
 }
 
@@ -45,6 +46,7 @@ export function getPostBySlug(slug: string): Post | null {
     excerpt: data.excerpt ?? '',
     tags: data.tags ?? [],
     readingTime: stats.text,
+    image: data.image ?? `/post-images/${slug}.png`,
     draft: data.draft ?? false,
     content,
   };
