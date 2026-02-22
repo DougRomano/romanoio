@@ -13,8 +13,7 @@ export default function HomePage() {
           Hey, I&apos;m Doug
         </p>
         <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 dark:text-white leading-tight mb-6">
-          AI-First Developer. <br className="hidden sm:block" />
-          20 Years of .NET Behind It.
+          AI-First Developer.
         </h1>
         <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl leading-relaxed mb-10">
           I spent two decades building .NET systems the traditional way. Now I build with AI agents,
