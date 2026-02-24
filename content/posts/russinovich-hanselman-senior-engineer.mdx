@@ -1,0 +1,90 @@
+---
+title: "Russinovich and Hanselman Just Redefined \"Senior Engineer\""
+date: "2026-02-24"
+excerpt: "Their ACM paper isn't a LinkedIn take. It's a peer-reviewed argument that the definition of seniority in software engineering has been fractured by generative AI — and from WAICF 2026, the same signal: seniority is no longer years of experience. It's judgment per token."
+tags: ["AI", "Software Engineering", "Tech Leadership", ".NET", "Senior Engineer", "AI-Assisted Development", "Engineering Leadership", "Software Architecture", "Developer Productivity"]
+---
+
+The skills that made you senior in 2020 won't make you senior in 2026.
+
+Mark Russinovich and Scott Hanselman just put that in writing. In the ACM.
+
+Their paper, *"Redefining the Software Engineering Profession for AI,"* published this month in *Communications of the ACM*, isn't a LinkedIn take or a conference keynote. It's a peer-reviewed argument that the definition of seniority in software engineering has been fractured by generative AI.
+
+And from WAICF 2026 in Cannes, the same signal from a different direction: seniority is no longer years of experience. It's judgment per token.
+
+Here's what that actually means if you're a .NET architect.
+
+## The Boost and the Drag
+
+Russinovich and Hanselman make a distinction that should change how you staff and mentor your teams.
+
+For senior engineers, generative AI coding tools produce an **AI Boost**. For early-in-career developers, they produce an **AI Drag**.
+
+Think about what happens when a senior .NET architect asks an AI agent to scaffold an OIDC token validation middleware with Dapper-backed claims hydration. They review the output in thirty seconds. They immediately see the audience claim isn't being validated against the expected client ID — a silent security gap that passes every unit test. They catch the Dapper query inside the claims enumeration loop that will fire one database round-trip per role, turning a login request into a connection pool liability under real traffic. They know what correct looks like and can verify it fast. The AI multiplies their throughput.
+
+Now put the same prompt in front of a junior developer. They get plausible-looking code they can't reliably verify. Worse, the AI removes the struggle that would have built the judgment to verify it. They move fast toward a cliff they can't see.
+
+The labor market already priced this in. After GPT-4 dropped, employment of 22–25-year-olds in software development fell roughly 13%. Senior roles grew. The rational short-term move is obvious: hire seniors, augment with AI, skip the interns.
+
+Russinovich and Hanselman's warning is about the long-term cost of that rational choice. Without a pipeline of early-career developers building real skills, there's no next generation of seniors. The profession eats itself.
+
+## Judgment Per Token
+
+The formulation from WAICF this year is worth sitting with: **seniority is now measured in judgment per token**.
+
+Every prompt to an AI coding agent is a resource expenditure. What you get back is a direct function of the judgment you put in. Senior engineers get better outputs not because they type faster or know more syntax. They get better outputs because they carry a richer model of the problem space, the failure modes, and the constraints that actually matter.
+
+Two engineers ask Copilot to design a distributed caching layer for a high-throughput .NET API. Engineer A gets a Redis implementation with basic string serialization. Engineer B's prompt implicitly encodes knowledge of cache stampede patterns, serialization overhead, TTL drift under load in Azure Cache for Redis, and the operational reality of sliding versus absolute expiry. Engineer B's judgment is doing the work before the first token is generated.
+
+The AI didn't create that difference. That difference was always there. The AI just made it undeniable.
+
+## The 10x/100x Thread
+
+I wrote about this from a different angle a few months ago.
+
+The 10x engineer was never just fast at coding. They were fast at everything *around* the code. The architectural decisions that look fine today but cost you eighteen months of headaches. The patterns they've seen fail before. The ability to say "we've been here and it doesn't scale" before the team wastes three sprints.
+
+The real value was always knowing which code should never be written.
+
+The senior architect who says "we don't need a custom event bus—use Azure Service Bus and stop" just saved three months of engineering time. Not by writing more code. By writing dramatically less of the wrong code.
+
+That is now the *definition* of seniority, not a bonus trait. AI handles code generation at a baseline level of competence. What it cannot do is make the judgment call about whether the code should exist, what constraints actually matter, or where the hidden complexity lives.
+
+## What This Actually Changes for .NET Architects
+
+Three concrete shifts.
+
+**First: system design is your primary deliverable now.** The boilerplate—DI registrations, EF Core configurations, middleware pipelines—is being offloaded. That frees time. The question is whether you're spending that time on decisions that require judgment: decomposition strategy, consistency models, failure boundaries, observability design. If you're using the freed time to generate more boilerplate faster, you're not capturing the leverage.
+
+**Second: AI orchestration is now an architectural concern.** Semantic Kernel, the Azure AI Foundry SDK, agentic workflow design, prompt boundary hygiene, RAG pipeline design—these are not research curiosities anymore. If your organization is building any AI-augmented systems, and by 2026 most are, the architecture of how AI agents are orchestrated, constrained, verified, and rolled back is a production problem. Senior .NET architects who haven't developed fluency here are accumulating a skills deficit that's compounding.
+
+**Third: your verification instincts matter more, not less.** AI-generated code passes syntax checks and often passes unit tests. It does not inherently respect your domain invariants, your security posture, or your SLA obligations. The ability to read a PR and see what is wrong—not just what *looks* wrong—is load-bearing.
+
+## The Pipeline Responsibility You Cannot Outsource
+
+Here's the part of the Russinovich/Hanselman paper that engineering leaders need to read twice.
+
+They propose what they call a **Preceptor Model**: organizations must keep hiring early-in-career developers, accept that they initially reduce net capacity, and make their growth an explicit organizational goal. Not nice-to-have mentorship. An explicit objective.
+
+The judgment that makes a senior .NET engineer irreplaceable was forged in struggle. Debugging production incidents with no AI assist. Designing systems that failed and had to be rebuilt. Reading codebases that weren't theirs. If organizations strip out that formative struggle—replacing it with AI-generated output that juniors can't verify—there's no production line for the next generation of seniors.
+
+The .NET ecosystem is deep. The GC, the thread pool, EF Core's change tracker, Kestrel's connection handling, the subtleties of async state machines. AI can generate idiomatic C#. It cannot transfer the earned intuition of someone who has watched a ThreadPool starvation cascade in production. That intuition is transmitted person to person, in design reviews, in post-mortems, in deliberate mentorship.
+
+That's not optional. That's how the profession survives.
+
+## The Counterpoint Worth Hearing
+
+Not everyone buys the judgment-first argument. Some point out that AI compresses skill gaps—when the model does the hard parts, the difference between your best and average engineer narrows. Others argue that the senior engineers who built their reputation on pattern recognition and code generation—cranking out DAOs, DTOs, CRUD scaffolding—are actually less differentiated now, not more.
+
+Fair points. But they prove the same conclusion. The engineers whose value was mechanical speed lost ground. The engineers whose value was judgment, architecture, and knowing when to say no? The gap between them and everyone else just got wider.
+
+## The Title Has Not Changed. The Job Has.
+
+Your LinkedIn title still says Senior Engineer or Solutions Architect or Technical Lead. But the implicit contract behind it—what distinguishes you from a competent junior with a good AI setup—has shifted. Russinovich and Hanselman didn't write a piece about AI being scary. They wrote a piece about a structural shift that is already happening and demands a deliberate response.
+
+The new currency of seniority—**judgment per token**—was always the real currency. AI just made the exchange rate visible.
+
+The question isn't whether AI will take your job.
+
+The question is whether you're compounding the judgment that makes you irreplaceable—or just generating more code faster.
