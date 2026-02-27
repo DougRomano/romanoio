@@ -1,0 +1,335 @@
+---
+title: "Claude Remote Agents: Running 10 AI Agents While You're Not at Your Desk"
+date: "2026-02-27"
+excerpt: "How a 10-agent WinForms conversion system changed the way I think about 'being at my desk' — and the SSH + Tailscale + tmux stack that makes it work."
+tags: ["Claude Code", "Agentic Development", "tmux", "Tailscale", "DevOps", ".NET", "Remote Work"]
+---
+
+## The Problem Nobody Talks About
+
+You've finally done it. You've built an agentic AI system that actually works. It reads legacy code, understands business logic, maps UI components, extracts stored procedure patterns — and it runs largely on its own. You kick off the orchestrator, it starts chewing through a 20-year-old VB.NET WinForms codebase, and then... you have to sit there and watch it.
+
+Or do you?
+
+This is the challenge I ran into building the Claude Winforms Conversion Agent — a suite of 10 specialized TypeScript agents designed to systematically analyze and convert legacy VB.NET Windows Forms applications into modern ASP.NET Core MVC architecture. The orchestrator runs agents sequentially, each one building on the last, processing thousands of lines of legacy code across forms, business objects, data access layers, and security patterns. A full entity conversion can take a meaningful chunk of time to run.
+
+And I don't always have the luxury of sitting at my desk waiting for it.
+
+## What the Conversion Agent Actually Does
+
+Before getting into the remote monitoring setup, it's worth understanding what we're working with. The `claude-code-conversion-agent` is purpose-built for the BargeOps project — migrating the legacy Winforms system (VB.NET WinForms) to a modern BargeOps.API + BargeOps.UI architecture with ASP.NET Core, Dapper, and Bootstrap 5.
+
+The orchestrator runs 10 specialized agents in sequence:
+
+| Agent | Purpose |
+|-------|---------|
+| Agent 1 | Form Structure Analyzer — extracts controls, grids, event handlers |
+| Agent 2 | Business Logic Extractor — pulls rules, validation, factory methods |
+| Agent 3 | Data Access Pattern Analyzer — stored procedures, SQL parameters |
+| Agent 4 | Security & Authorization Extractor — permissions, button types |
+| Agent 5 | UI Component Mapper — UltraGrid → DataTables, UltraCombo → Select2 |
+| Agent 6 | Form Workflow Analyzer — event chains, state management |
+| Agent 7 | Detail Form Tab Analyzer — tab structure, related entity grids |
+| Agent 8 | Validation Rule Extractor — field constraints, error messages |
+| Agent 9 | Related Entity Analyzer — parent-child relationships |
+| Agent 10 | Conversion Template Generator — interactive code generation in Claude Code |
+
+Kick it off for an entity like "Facility":
+
+```bash
+bun run agents/orchestrator.ts --entity "Facility" --form-name "frmFacilitySearch"
+```
+
+Then grab a coffee. Or take a meeting. Or leave the office.
+
+That last part — leave the office — is exactly what this article is about.
+
+## The Architecture: SSH + Tailscale + tmux
+
+The solution is three components working together. None of them are complicated individually. Together they give you something powerful: a persistent, accessible, resumable development session from anywhere in the world.
+
+### Component 1: Tailscale (Zero-Config Networking)
+
+Tailscale creates a private mesh VPN between your devices with no port forwarding, no dynamic DNS, no router configuration. Your dev machine gets a stable `100.x.x.x` address that's reachable from your phone, laptop, or tablet regardless of where you are.
+
+```bash
+# On your dev machine (WSL2 on Windows works great)
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up
+
+# Check your Tailscale IP — this becomes your stable remote address
+tailscale ip -4
+```
+
+Install Tailscale on your phone or secondary laptop, log in with the same account, and your devices are on the same private network. Done.
+
+### Component 2: SSH (The Terminal Bridge)
+
+With Tailscale running, SSH access is standard. Set up key-based auth so you're not typing passwords from your phone:
+
+```bash
+# Generate a key on your mobile/secondary device
+ssh-keygen -t ed25519 -C "mobile-dev"
+
+# Copy the public key to your dev machine
+ssh-copy-id -i ~/.ssh/id_ed25519.pub doug@100.x.x.x
+
+# Test the connection
+ssh doug@100.x.x.x
+```
+
+Add a clean alias in `~/.ssh/config` for convenience:
+
+```
+Host devbox
+  HostName 100.x.x.x
+  User doug
+  IdentityFile ~/.ssh/id_ed25519
+```
+
+Now it's just: `ssh devbox`
+
+### Component 3: tmux (The Persistence Layer)
+
+This is where the magic happens for agentic workflows. tmux is a terminal multiplexer that keeps your sessions alive independent of your SSH connection. If your phone loses WiFi mid-session, the agent keeps running. When you reconnect, you attach right back to where you left off — output intact, context preserved.
+
+**Initial setup:**
+
+```bash
+sudo apt install tmux
+```
+
+Drop this in `~/.tmux.conf` for a quality-of-life baseline:
+
+```bash
+# Mouse support — click to switch panes
+set -g mouse on
+
+# Bigger scrollback for long agent output
+set -g history-limit 50000
+
+# Better colors
+set -g default-terminal "screen-256color"
+
+# Status bar with time
+set -g status-right '%Y-%m-%d %H:%M'
+
+# Quick config reload
+bind r source-file ~/.tmux.conf \; display "Reloaded!"
+```
+
+## The Workflow for Agent Sessions
+
+Here's the session layout that works well for the conversion agent workflow:
+
+```bash
+# On your dev machine — create a named session
+tmux new -s bargeops
+
+# Window 1 (default): Claude Code / Agent Orchestrator
+bun run agents/orchestrator.ts --entity "Facility"
+
+# Ctrl+B C — open a second window
+# Window 2: Build output / dotnet watch
+dotnet build src/BargeOps.API/
+
+# Ctrl+B C — open a third window
+# Window 3: Git status / review generated output
+git status
+cat output/Facility/conversion-plan.md
+
+# Rename windows for clarity
+# Ctrl+B , → "agents"
+# Ctrl+B , → "build"
+# Ctrl+B , → "review"
+```
+
+Switch between windows with `Ctrl+B 0`, `Ctrl+B 1`, `Ctrl+B 2`.
+
+## The Remote Monitoring Workflow in Practice
+
+Here's what a real day looks like with this setup.
+
+**8:00 AM — At your desk**
+
+```bash
+ssh devbox
+tmux new -s bargeops
+# or if already created:
+tmux attach -t bargeops
+
+# Kick off a conversion for Facility
+bun run agents/orchestrator.ts --entity "Facility" --form-name "frmFacilitySearch"
+```
+
+Agents 1 through 9 are now running sequentially. Agent 1 is parsing `frmFacilitySearch.vb`, extracting control definitions, grid column layouts, event handler mappings.
+
+**9:30 AM — You have a meeting**
+
+```bash
+# Detach from the session — agents keep running
+Ctrl+B D
+```
+
+Walk to your meeting. The orchestrator doesn't know you left. It doesn't care. It's still extracting business rules from `FacilityLocation.vb`, still mapping `UltraGrid` to `DataTables`, still tracing stored procedure parameters through `AddFetchParameters`.
+
+**10:15 AM — From your phone during a break**
+
+Open Termius (iOS/Android) or any SSH client. Connect to `devbox`. Reattach:
+
+```bash
+tmux attach -t bargeops
+```
+
+Check the output. See where Agent 4 (Security Extractor) got to. Review what it found in `InitializeBase` for SubSystem identifiers. Maybe it's already on Agent 7 analyzing tab structure.
+
+Detach again. Go back to your meeting.
+
+**12:30 PM — Lunch**
+
+Agents 1–9 are done. The orchestrator has written its JSON output to `output/Facility/`:
+
+```
+output/Facility/
+├── form-structure-search.json
+├── form-structure-detail.json
+├── business-logic.json
+├── data-access.json
+├── security.json
+├── ui-mapping.json
+├── workflow.json
+├── tabs.json
+├── validation.json
+└── related-entities.json
+```
+
+Now it's time for the interactive step. Agent 10 — the Conversion Template Generator — always runs interactively in Claude Code. This is the collaborative piece:
+
+```bash
+# Run from your laptop at lunch, picking up exactly where the analysis left off
+bun run generate-template --entity "Facility"
+```
+
+Claude Code reads all 9 analysis files and starts generating the conversion plan, DTOs for `BargeOps.Shared`, repository interfaces, service layers, API controllers, ViewModels, Razor views, and DataTables JavaScript. You guide it, ask questions, iterate on patterns.
+
+**3:00 PM — Back at your desk**
+
+The generated output is ready for review:
+
+```
+output/Facility/
+├── conversion-plan.md
+└── templates/
+    ├── shared/
+    │   └── Dto/
+    │       ├── FacilityLocationDto.cs
+    │       └── FacilitySearchRequest.cs
+    ├── api/
+    │   ├── Controllers/
+    │   ├── Services/
+    │   ├── Repositories/
+    │   └── DataAccess/Sql/
+    └── ui/
+        ├── Models/
+        ├── Controllers/
+        ├── Views/
+        └── wwwroot/js/
+```
+
+All of this happened while you were in meetings, at lunch, commuting. The agents did the heavy lifting. tmux kept everything alive. Tailscale kept you connected.
+
+## Essential tmux Commands for This Workflow
+
+| Action | Keys |
+|--------|------|
+| Detach (session stays alive) | `Ctrl+B D` |
+| New window | `Ctrl+B C` |
+| Switch windows | `Ctrl+B 0-9` |
+| Rename window | `Ctrl+B ,` |
+| Split horizontally | `Ctrl+B "` |
+| Split vertically | `Ctrl+B %` |
+| Switch panes | `Ctrl+B ←→↑↓` |
+| Scroll mode (read output) | `Ctrl+B [` then `q` to exit |
+| List sessions | `Ctrl+B S` |
+
+**Essential shell commands:**
+
+```bash
+# List all running sessions
+tmux ls
+
+# Attach to a session
+tmux attach -t bargeops
+
+# Create a new named session
+tmux new -s bargeops
+
+# Kill a session when done
+tmux kill-session -t bargeops
+```
+
+### The Reconnect After Drop
+
+This is the killer feature. SSH connection dies? Network hiccups on your phone?
+
+```bash
+ssh devbox
+tmux attach -t bargeops
+```
+
+You're back. Exactly where you left off. The agent output is all there in the scrollback. Nothing was lost.
+
+## Why This Matters for Agentic Workflows
+
+Traditional development has a tight feedback loop: write code, run, see result, repeat. Agentic workflows break that loop by design — the agent runs for a while, you check back in, you guide it forward.
+
+That "run for a while" part is the key. The conversion agent doesn't need you watching it parse business objects. It needs you at the start (kick it off) and at the end (review output and run the interactive template generator). Everything in between is compute time, and compute time doesn't require a chair.
+
+The tmux + SSH + Tailscale stack turns that middle period from "waiting at your desk" into "living your life while the agent works." Check from your phone. Check from another machine. Check from a coffee shop. The session is always there, always current, always resumable.
+
+For a project like BargeOps — converting hundreds of legacy WinForms screens into a modern ASP.NET Core MVC architecture — this isn't a convenience. It's a force multiplier. Your agents are working when you're not. You just need to be able to check in.
+
+## Quick Setup Checklist
+
+```bash
+# 1. Install and start Tailscale on dev machine
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up
+
+# 2. Enable SSH on dev machine
+sudo apt install openssh-server
+sudo systemctl enable ssh && sudo systemctl start ssh
+
+# 3. Set up key auth from your secondary device
+ssh-keygen -t ed25519
+ssh-copy-id -i ~/.ssh/id_ed25519.pub doug@$(tailscale ip -4)
+
+# 4. Install and configure tmux
+sudo apt install tmux
+echo "set -g mouse on" >> ~/.tmux.conf
+echo "set -g history-limit 50000" >> ~/.tmux.conf
+
+# 5. Create your persistent dev session
+tmux new -s bargeops
+
+# 6. Start your agent run
+bun run agents/orchestrator.ts --entity "YourEntity"
+
+# 7. Detach and walk away
+# Ctrl+B D
+
+# 8. Reconnect from anywhere
+ssh devbox && tmux attach -t bargeops
+```
+
+## The Bigger Picture
+
+There's a philosophical shift happening in how we develop software. AI agents are doing the tedious extraction work — parsing legacy code, mapping UI components, generating boilerplate. But they still need humans in the loop: to kick them off, to review their output, to guide the interactive generation steps.
+
+The infrastructure described here — Tailscale for networking, SSH for access, tmux for persistence — is what makes that human-in-the-loop model actually ergonomic. You're not chained to your desk for the parts that don't need you there. You show up for the parts that do.
+
+Your agents work while you live your life. You check in when it matters. That's the remote developer's edge.
+
+---
+
+*The Claude WinForms Conversion Agent is available on GitHub: [github.com/DougRomano/claude-code-conversion-agent](https://github.com/DougRomano/claude-code-conversion-agent)*
