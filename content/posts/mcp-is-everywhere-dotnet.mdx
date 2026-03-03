@@ -1,0 +1,176 @@
+---
+title: "MCP Is Everywhere — But Where Are the .NET Examples?"
+date: "2026-03-03"
+excerpt: "The biggest first-mover opportunity in the .NET AI ecosystem, and almost nobody's taking it."
+tags: ["MCP", ".NET", "AI", "Architecture", "Agent Framework"]
+---
+
+I Went Looking for .NET MCP Content. I Didn't Find Much.
+
+Model Context Protocol is everywhere. Claude Code uses it to talk to my filesystem. Agent Framework treats MCP servers as first-class citizens. Azure Functions went GA with MCP hosting support in January. Visual Studio 2026 shipped with MCP integration baked into its agent instruction files. Even GitHub Copilot adopted it.
+
+MCP is the USB-C of AI tooling. One protocol, universal connectivity. Build a server once, and Claude Code can use it. Copilot can use it. Your Agent Framework agents can use it. Any future client that speaks the protocol can use it. Before MCP, every framework invented its own tool-calling mechanism. Semantic Kernel had plugins. LangChain had tools. AutoGen had function calls. None of them talked to each other.
+
+That's over now. MCP won.
+
+One of the first real .NET MCP demos I saw was at DevUp last October in St. Louis, given by Kevin Grossnicklaus. It clicked immediately—this was the integration layer enterprise .NET had been missing. So I went looking for tutorials to go deeper. Real ones. The kind that show you how to build an MCP server in C#, wire it into your existing architecture, deploy it to Azure, and debug it when an agent calls the wrong tool with the wrong parameters at 2 AM.
+
+I found almost nothing.
+
+Hundreds of Python tutorials. Dozens of TypeScript walkthroughs. YouTube channels dedicated to building MCP servers in frameworks I've never heard of. And for .NET? Microsoft's official blog post, a handful of Azure-Samples repos, and maybe five community blog posts total. That's the entire .NET MCP content ecosystem in March 2026.
+
+This is a problem. It's also an enormous opportunity. And I know, because I've been building agents that are one MCP server away from being ten times more powerful.
+
+## What Actually Exists Today
+
+Let me be specific, because vague claims about content gaps aren't useful.
+
+### The Official Layer
+
+Microsoft has done their part at the foundation. The official C# SDK for Model Context Protocol—co-maintained between Microsoft and the MCP open protocol organization—is on NuGet and GitHub. It's real, maintained, and works. The `modelcontextprotocol/csharp-sdk` repo has clear documentation for building both servers and clients.
+
+The .NET blog published *"Build a Model Context Protocol (MCP) Server in C#"* last May. Microsoft Learn has a getting-started page. Azure-Samples has several MCP repositories: a hub repo linking to samples across languages, `remote-mcp-webapp-dotnet` for Azure Web App hosting, `remote-mcp-functions-dotnet` for Azure Functions hosting, and `microsoft/mcp-dotnet-samples` as a comprehensive sample collection. Agent Framework RC has native MCP integration, meaning your agents can discover and call MCP servers without custom plumbing.
+
+The infrastructure is there. The SDK is there. The hosting options are there.
+
+What's missing is everything between *"here's the SDK"* and *"here's how I solved a real problem with it."*
+
+### The Community Layer
+
+This is where it gets painful. I found exactly a handful of community blog posts about building MCP servers in C#. A few individual developers wrote one each. A couple of Medium posts. That's about it. Compare that to the Python MCP ecosystem, where hundreds of blog posts, YouTube tutorials, and community-built servers cover everything from database integration to Slack bots to file system tooling.
+
+On Stack Overflow, MCP questions in the .NET tag are sparse. Reddit's r/dotnet has scattered discussions—mostly developers asking the same question I was asking: *"How do I actually build one of these?"* The answers are usually a link to Microsoft's blog post and good luck.
+
+The MCP server registry at mcp.so tells the story clearly. Most listed servers are TypeScript or Python. The C# entries are overwhelmingly official Microsoft samples, not community-built tools solving specific problems.
+
+I want to be clear about what I'm *not* saying. The C# SDK is excellent. Microsoft has invested. What's missing is the community layer—the *"I built this to solve this specific problem and here's what I learned"* content. That's the layer that actually helps developers adopt a technology.
+
+## How We Got Here
+
+This content desert didn't happen by accident.
+
+### MCP Was Born in Python and TypeScript
+
+Anthropic launched MCP in November 2024 with Python and TypeScript SDKs. The C# SDK came later—born from a community project by Peder Holdahl Pettersen called `mcpdotnet` that Microsoft eventually adopted and elevated to official status. By the time C# developers had a production-ready SDK, the Python community had a six-month head start building servers, writing tutorials, and establishing patterns.
+
+Six months doesn't sound like much. In AI development, it's a generation.
+
+### Enterprise .NET Developers Move Differently
+
+I've been in this ecosystem for 25 years. The .NET community has always been more enterprise-oriented. Enterprise developers are cautious. They wait for GA releases. They need architecture review board approval. They don't typically write blog posts about beta SDKs they're experimenting with on weekends.
+
+This is both a cultural strength and a content weakness. The enterprise approach produces more stable, production-ready code. It also means fewer people sharing experiments, fewer early-stage tutorials, fewer *"I built a thing and here's what happened"* posts. The Python community shares experiments. The .NET community shares solutions. The problem is that MCP is new enough that most .NET developers haven't reached the solution stage yet.
+
+### The Framework Churn Ate the Bandwidth
+
+Over the past year, .NET developers interested in AI got whiplash. Learn Semantic Kernel. Actually, learn MEAI first. Wait, Agent Framework is replacing SK's planners. Hold on, it's still in RC. Each transition consumed learning bandwidth.
+
+I watched this in real time. Developers in my network started Semantic Kernel tutorials in mid-2025, got halfway through, learned that MEAI was the new foundation, started over, then heard about Agent Framework merging SK and AutoGen, and paused again. By the time the dust settled in February 2026, MCP had been out for over a year and the .NET community was still catching its breath from framework migration.
+
+The developers who might have been building MCP servers were busy figuring out which framework to build them for.
+
+## What I Built Instead — And Why MCP Would Have Made It Better
+
+I want to tell you about something I've been building for the last six to nine months, because it illustrates both how powerful agents already are and how much more powerful they'd be with MCP.
+
+I built a multi-agent conversion system. Ten specialized agents, orchestrated by a master orchestrator, designed to systematically migrate legacy desktop applications to modern web architecture. Not a proof of concept. A production tool that my team uses to convert real enterprise entities from a codebase that's been running for over fifteen years.
+
+Each agent has a specific job. One extracts form structure—every control, grid column, event handler, and validation pattern. Another extracts business logic and rules from business objects. Another maps data access patterns and stored procedures. Others handle security extraction, UI component mapping, workflow analysis, tab structure, validation rules, and entity relationships. The final agent generates complete conversion templates—DTOs, repositories, services, controllers, ViewModels, views, and client-side code—all organized for the target architecture.
+
+We're heavily using SpecKit to drive architectural decisions throughout the conversion process. The agents don't just extract code—they produce structured artifacts that feed into the next phase. Workflow diagrams. Mermaid diagrams showing entity relationships, form lifecycles, and data flow. Structured JSON output files that get consumed by subsequent agents in the pipeline. Each agent reads the JSON produced by the agents before it, building a richer picture of the legacy system with every step. By the time the template generator runs, it has a complete, machine-readable map of the entire entity—not a summary, not a guess, but structured data it can reason over.
+
+The orchestrator runs all ten agents in sequence. You point it at an entity and it reads every related source file—forms, business objects, data access layers. Each agent produces its structured JSON analysis, its Mermaid diagrams, its workflow documentation. Then the template generation phase runs interactively in Claude Code so I can review, iterate, and make architectural calls with SpecKit's guidance.
+
+Each agent has its own system prompt—a markdown file that defines behavior, responsibilities, and best practices for that specific type of conversion work. A `CLAUDE.md` in the project root sets project-wide conventions. A `WORKFLOW.md` documents the complete multi-phase pipeline from analysis through deployment and testing.
+
+Here's the thing: this system works. It's converted multiple entities from a legacy codebase into a modern .NET architecture with shared DTOs, Dapper repositories, service layers, MVC controllers, and full front-end integration. Entities that would have taken a developer weeks of manual analysis and rewriting are getting converted in days.
+
+### Where MCP Would Transform This
+
+But the agents are limited. Right now, each agent reads files directly from the filesystem. The paths to the legacy codebase, the reference projects, and the target monorepo are all hardcoded in a `config.json`. The agents can only run on my machine, pointed at my specific directory structure. If another team wanted to use this system for their own legacy migration, they'd need to clone the repo, edit the config, and hope their codebase structure matches what the agents expect.
+
+MCP changes that equation completely.
+
+Imagine each data source as an MCP server instead. An MCP server wrapping the legacy codebase that exposes tools like `GetFormStructure`, `GetBusinessObject`, and `GetStoredProcedure`. Another MCP server wrapping the target project that exposes tools like `GetExistingPatterns`, `CheckNamespaceConventions`, and `ValidateProjectReferences`. A third MCP server wrapping SQL Server that lets agents query the actual database schema, stored procedure signatures, and sample data.
+
+With MCP, the conversion agents become portable. They don't care where the legacy code lives—they call a tool and get structured data back. They don't care whether the target is a monorepo or separate projects—they call a tool and get the current architecture conventions. The agents become reusable across clients, across codebases, across teams. The intelligence stays in the agent prompts and orchestration logic. The data access becomes a standard protocol.
+
+That's the MCP promise for enterprise .NET development. Not just chatbots with tool calling. Not just database query wrappers. Entire multi-agent systems that can be pointed at any codebase, any infrastructure, any legacy system—because the integration layer speaks a universal protocol.
+
+And the blog post explaining how to build that in C#? It doesn't exist yet.
+
+## What I've Learned Building MCP Servers in C#
+
+I build with Claude Code and agentic workflows every day. Not demos. Not proofs of concept. Production systems for enterprise clients. MCP servers are part of that workflow, and I've learned things that aren't documented anywhere.
+
+### The .NET Advantage Nobody's Talking About
+
+An MCP server is a process that exposes tools through a standard protocol. In C#, you use the official SDK's `ModelContextProtocol` NuGet package. You create a host, register your tools as methods decorated with MCP attributes, configure a transport—stdio for local, HTTP with Server-Sent Events for remote—and start the server. That's the skeleton.
+
+The real work is in the tools themselves. Each tool is a C# method that takes structured input and returns structured output. Want to expose your existing .NET API? Wrap the call, add the MCP attributes, register it. Your existing `HttpClient`, Entity Framework context, or custom service layer plugs right in through standard dependency injection.
+
+This is where .NET developers have an enormous advantage. We have 25 years of enterprise integration patterns. Dependency injection. Middleware pipelines. Strongly-typed configuration. Health checks, logging, observability baked into the platform. A Python developer building an MCP server has to bring all of that themselves. A C# developer inherits it from the framework.
+
+I've built MCP servers that expose SQL Server stored procedures as tools for AI agents. I've built MCP servers that wrap legacy WCF services—yes, WCF, because enterprise systems don't retire just because a shiny new protocol shows up—and make them accessible to Claude Code. Every one of these took advantage of existing .NET infrastructure that would have been built from scratch in Python.
+
+### The Production Realities Nobody's Writing About
+
+**Authentication and authorization are not solved.** The MCP spec handles transport security, but which agent can call which tools with what permissions? That's entirely on you. In enterprise .NET environments, that means Azure AD integration, JWT claims mapped to tool permissions, and custom authorization middleware the SDK doesn't provide. I built a layer that sits between transport and tool handlers—inspects the request, extracts caller identity, checks a policy store. This pattern should be a NuGet package by now. It isn't.
+
+**Error handling across the MCP boundary is messy by default.** Unhandled exceptions surface as opaque messages that give the agent nothing to work with. I build structured error responses for every tool—the response tells the agent whether it was a connection issue, a timeout, or a permissions problem, with enough detail for the agent to decide whether to retry or ask the user for help.
+
+**Observability is critical and undocumented.** OpenTelemetry integrates beautifully with the MCP server lifecycle. I instrument every tool call with custom spans, recording tool name, input parameters (redacted for sensitive data), execution duration, and response summary. The specific *"how to instrument MCP servers with OpenTelemetry"* guide doesn't exist yet.
+
+**Testing is its own discipline.** I've settled on three layers: unit tests for tool logic, integration tests using the SDK's in-process client, and end-to-end tests that spin up the server and connect a real MCP client. Each catches different bugs—logic errors, serialization issues, and the things you only discover when a real agent uses your server and the parameter names don't match what it expects.
+
+### What an MCP Server Actually Looks Like in Practice
+
+Let me make this concrete, because abstract descriptions of protocols don't help anyone ship code.
+
+Last month I needed an AI agent to query a client's legacy SQL Server database. Fifteen years in production. Stored procedures that encode business rules nobody fully remembers. The client wanted their Agent Framework agent to answer questions about order history, inventory levels, and customer accounts—without giving the agent direct SQL access.
+
+So I built an MCP server. Four tools: `GetOrderHistory`, `GetInventoryLevel`, `SearchCustomers`, and `GetAccountBalance`. Each tool calls the corresponding stored procedure through Entity Framework, validates the output, and returns a structured response. The agent never sees raw SQL. It never sees connection strings. It calls a tool, gets a result, moves on.
+
+The whole thing took a day. Not because MCP is hard—the SDK makes the basics straightforward—but because the production concerns took time. Input validation so the agent can't pass SQL injection through tool parameters. Output sanitization so sensitive data doesn't leak into agent responses. Rate limiting so a runaway agent loop doesn't hammer the database. OpenTelemetry spans so I can trace every tool call back to the agent interaction that triggered it.
+
+None of those production concerns are in any tutorial I've found. The tutorials show you the happy path: register a tool, call it, get a result. The gap between that and something you'd actually put in front of a client is enormous. And it's a gap that .NET developers are uniquely qualified to fill, because we've been building exactly these kinds of guardrails for decades.
+
+That MCP server is now running on an Azure Function with HTTP+SSE transport. Claude Code connects to it from my terminal. The client's Agent Framework agents connect to it from their internal tools. Same server, multiple clients, zero code changes. That's the MCP promise, and in .NET it actually delivers.
+
+## The First-Mover Opportunity
+
+Think about the developers who wrote the first ASP.NET Web API blog posts. Or the ones who documented Entity Framework patterns before the official docs caught up. Or the ones who wrote about dependency injection in .NET before Microsoft built it into the framework. They became recognized authorities not because they were the best programmers, but because they were the first to document their experience publicly.
+
+The .NET MCP space is in that exact moment right now.
+
+The technology is production-ready. The demand is growing—every developer building with Agent Framework needs MCP servers, and most of them are searching for guidance that doesn't exist. If you build an MCP server in C# and write about what you learned, you're creating content that developers will find because there's almost nothing else to find.
+
+I'm not talking about writing comprehensive documentation. I'm talking about practical posts. *"I built an MCP server that wraps my EF repository and here's the code."* *"I connected my Agent Framework agent to a custom MCP server and here are the three things that surprised me."* *"Here's how I handle auth in my .NET MCP server."* *"I built an MCP server to expose my legacy codebase to a multi-agent conversion system."* Each of those posts would be among the first of its kind.
+
+That's rare in a technology ecosystem as mature as .NET.
+
+## Why This Matters for .NET's Future
+
+I'll be direct about the stakes. MCP is becoming the integration standard for AI applications. Every major framework supports it or is adding support. The companies building the next generation of AI-powered enterprise software are choosing their stacks right now, and the ecosystems with the richest MCP tooling will attract the most adoption.
+
+Python has hundreds of community MCP servers. TypeScript has dozens. .NET has a handful of official samples and a few blog posts. If that gap doesn't close, enterprise teams evaluating AI stacks will look at the MCP ecosystem, see Python has ten times the tooling, and choose Python. Not because .NET is worse—it's arguably better for enterprise AI development—but because the community content isn't there to prove it.
+
+This has happened before. .NET was late to the container ecosystem. Docker became synonymous with Linux for years before .NET caught up. .NET was late to serverless. Lambda launched with Python and Node.js long before .NET support. Each time, the technology eventually caught up, but the community fought an uphill battle against the perception that .NET wasn't a serious player.
+
+We have a chance to avoid that pattern with MCP. The SDK is production-ready. Azure hosting is GA. Agent Framework has native support. The infrastructure is ahead of the community for once. All that's missing is the content—the tutorials, the blog posts, the real-world examples, the community-built servers—that proves .NET belongs in the MCP conversation.
+
+## The Call
+
+I'm going to keep building MCP servers in C# and writing about what I learn on romano.io. My conversion agent system—those ten specialized agents migrating legacy VB.NET to modern .NET—is getting MCP servers as its next evolution. I'll document every step.
+
+But one voice isn't enough to fill a content desert.
+
+The .NET community is one of the most talented developer communities in the world. We build the systems that run global enterprises. We know authentication, authorization, observability, error handling, and testing at scale. Those are exactly the skills MCP server development demands.
+
+The technology is ready. The demand is real. The content gap is your advantage.
+
+Build something. Write about it. Be the blog post that the next developer searching for *".NET MCP server"* actually finds.
+
+Because right now, that search returns almost nothing.
+
+And that won't last.
