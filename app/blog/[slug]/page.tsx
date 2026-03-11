@@ -8,7 +8,6 @@ import rehypeHighlight from 'rehype-highlight';
 import rehypeSlug from 'rehype-slug';
 import rehypeAutolinkHeadings from 'rehype-autolink-headings';
 import { getPostBySlug, getAllPosts } from '@/lib/posts';
-import NewsletterSignup from '@/components/NewsletterSignup';
 
 // Syntax highlighting theme (GitHub Dark)
 import 'highlight.js/styles/github-dark.css';
@@ -131,8 +130,7 @@ export default function PostPage({ params }: Props) {
 
       {/* Footer */}
       <div className="mt-16 pt-8 border-t border-gray-100 dark:border-gray-800">
-        <NewsletterSignup />
-        <div className="flex items-center justify-between mt-8">
+        <div className="flex items-center justify-between">
           <Link href="/blog" className="text-sm text-accent-600 dark:text-accent-400 hover:underline font-medium">
             ← All posts
           </Link>
