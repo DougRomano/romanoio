@@ -104,7 +104,7 @@ another on `(B)` for the same table because they serve different query shapes.
 ## Filtered indexes: an underrated tool
 
 If a large percentage of your queries filter on the same subset (e.g., only active
-records), a filtered index can be dramatically smaller and faster than a full index:
+records), a filtered index can be much smaller and faster than a full index:
 
 ```sql
 -- 98% of reads are on active orders only
