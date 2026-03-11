@@ -23,7 +23,7 @@ export default function NewsletterSignup() {
           async
           data-uid={KIT_FORM_UID}
           src={KIT_FORM_SCRIPT_URL}
-          strategy="lazyOnload"
+          strategy="afterInteractive"
         />
       </div>
     </div>
