@@ -8,6 +8,7 @@ import rehypeHighlight from 'rehype-highlight';
 import rehypeSlug from 'rehype-slug';
 import rehypeAutolinkHeadings from 'rehype-autolink-headings';
 import { getPostBySlug, getAllPosts } from '@/lib/posts';
+import NewsletterSignup from '@/components/NewsletterSignup';
 
 // Syntax highlighting theme (GitHub Dark)
 import 'highlight.js/styles/github-dark.css';
@@ -26,6 +27,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: post.title,
     description: post.excerpt,
+    alternates: {
+      canonical: `https://romano.io/blog/${params.slug}`,
+    },
     openGraph: {
       title: post.title,
       description: post.excerpt,
@@ -49,8 +53,28 @@ export default function PostPage({ params }: Props) {
     ] as any[],
   };
 
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: post.title,
+    description: post.excerpt,
+    datePublished: post.date,
+    author: {
+      '@type': 'Person',
+      name: 'Doug Romano',
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'romano.io',
+    },
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Back link */}
       <Link
         href="/blog"
@@ -106,18 +130,21 @@ export default function PostPage({ params }: Props) {
       </article>
 
       {/* Footer */}
-      <div className="mt-16 pt-8 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
-        <Link href="/blog" className="text-sm text-accent-600 dark:text-accent-400 hover:underline font-medium">
-          ← All posts
-        </Link>
-        <a
-          href={`https://github.com/DougRomano/romanoio`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-sm text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-        >
-          Edit on GitHub →
-        </a>
+      <div className="mt-16 pt-8 border-t border-gray-100 dark:border-gray-800">
+        <NewsletterSignup />
+        <div className="flex items-center justify-between mt-8">
+          <Link href="/blog" className="text-sm text-accent-600 dark:text-accent-400 hover:underline font-medium">
+            ← All posts
+          </Link>
+          <a
+            href={`https://github.com/DougRomano/romanoio`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          >
+            Edit on GitHub →
+          </a>
+        </div>
       </div>
     </div>
   );
