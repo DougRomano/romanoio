@@ -7,7 +7,7 @@ tags: ["SQL", "Performance", "SQL Server"]
 
 Every time I inherit a slow application, I start the same way: I open Query Store,
 sort by average CPU, and look at the top 10 offenders. Nine times out of ten, the
-fix is an index. But "add an index" is deceptively simple advice — the *which*, *where*,
+fix is an index. But "add an index" is deceptively simple advice. The *which*, *where*,
 and *why* of it takes years to internalize.
 
 Here's the mental model I've landed on.
@@ -15,7 +15,7 @@ Here's the mental model I've landed on.
 ## Why indexes get misunderstood
 
 The naive take is that indexes are just magic speed-up things. Slap one on the column
-you're filtering and you're done. That works — until it doesn't.
+you're filtering and you're done. That works, until it doesn't.
 
 The real picture: an index is a sorted copy of (part of) your data, stored separately,
 maintained on every write. You're trading **write overhead and storage** for **read speed**.
@@ -31,7 +31,7 @@ Before creating any index, I ask:
 
 ## Clustered vs. non-clustered
 
-SQL Server tables have exactly **one clustered index** — this *is* the table, physically
+SQL Server tables have exactly **one clustered index**, and this *is* the table, physically
 ordered by those key columns. Everything else is a non-clustered index, which stores
 the indexed columns plus a pointer back to the clustered row.
 
@@ -54,8 +54,8 @@ decision that's easy to get wrong at schema design time and expensive to change 
 
 The most important thing to internalize from an execution plan:
 
-- **Index Seek** → SQL Server jumped directly to the rows. Good.
-- **Index Scan** → SQL Server read the whole (or most of the) index. Often bad.
+- **Index Seek**: SQL Server jumped directly to the rows. Good.
+- **Index Scan**: SQL Server read the whole (or most of the) index. Often bad.
 
 A scan on a small table is fine. A scan on a 50M-row table is a full table read, even
 if it's going through a non-clustered index.
@@ -67,8 +67,8 @@ produce scans regardless of indexing.
 ## Covering indexes are underused
 
 A covering index includes all the columns a query needs, so SQL Server never has to
-look up the base table row (called a **key lookup**). Key lookups are the silent killers —
-they look small in the plan but explode under load.
+look up the base table row (called a **key lookup**). Key lookups are the silent killers.
+They look small in the plan but explode under load.
 
 ```sql
 -- Query that frequently runs:
@@ -88,7 +88,7 @@ in INCLUDE**.
 
 ## Column order in composite indexes
 
-Column order matters — a lot. SQL Server can use a composite index for a query only if
+Column order matters. A lot. SQL Server can use a composite index for a query only if
 the **leading edge** (leftmost key columns) is referenced.
 
 ```sql
@@ -99,7 +99,7 @@ the **leading edge** (leftmost key columns) is referenced.
 ```
 
 This is the "leftmost prefix" rule. It's why you sometimes see an index on `(A, B)` and
-another on `(B)` for the same table — they serve different query shapes.
+another on `(B)` for the same table because they serve different query shapes.
 
 ## Filtered indexes: an underrated tool
 
@@ -123,14 +123,14 @@ optimizer to consider it.
 
 1. **Get the actual execution plan** (`SET STATISTICS IO, TIME ON` or SSMS / Azure Data Studio)
 2. Find the **most expensive operator** (fat arrows in the plan, high estimated rows vs. actual rows mismatch)
-3. Look for **key lookups** — almost always worth eliminating with INCLUDE columns
-4. Look for **table scans** — is the predicate selective enough for an index to help?
-5. Check **missing index hints** in the plan — they're a suggestion, not gospel, but worth considering
+3. Look for **key lookups**, almost always worth eliminating with INCLUDE columns
+4. Look for **table scans**: is the predicate selective enough for an index to help?
+5. Check **missing index hints** in the plan. They're a suggestion, not gospel, but worth considering
 6. Verify with `sys.dm_exec_query_stats` or Query Store whether the query improved after the change
 
 ## The thing nobody tells you
 
-Indexes don't just slow down writes — they also consume buffer pool cache. An
+Indexes don't just slow down writes. They also consume buffer pool cache. An
 over-indexed table might be reading fast in dev (warm cache, small data volume) and
 slow in prod (cold cache, 200 million rows fighting for buffer pool space with your
 expensive indexes).

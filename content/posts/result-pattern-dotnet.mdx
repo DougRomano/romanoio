@@ -1,7 +1,7 @@
 ---
 title: "Ditching Exceptions for the Result Pattern in .NET"
 date: "2025-01-20"
-excerpt: "Exceptions are the wrong tool for expected failures. The Result pattern makes error paths explicit, composable, and testable — here's how I use it in C#."
+excerpt: "Exceptions are the wrong tool for expected failures. The Result pattern makes error paths explicit, composable, and testable. Here's how I use it in C#."
 tags: [".NET", "C#", "Architecture", "Patterns"]
 ---
 
@@ -10,9 +10,9 @@ you genuinely didn't see coming. They are *not* for "this email is already taken
 "the order is past the cancellation window."
 
 When expected failures flow through exceptions, you get:
-- **Invisible error paths** — callers have no idea what can go wrong without reading the implementation
-- **Control flow through side channels** — try/catch scattered through your call stack
-- **Expensive allocations** — exceptions capture a stack trace on construction
+- **Invisible error paths**: callers have no idea what can go wrong without reading the implementation
+- **Control flow through side channels**: try/catch scattered through your call stack
+- **Expensive allocations**: exceptions capture a stack trace on construction
 
 The Result pattern fixes this. Here's how I implement and use it in C#.
 
@@ -102,7 +102,7 @@ public class OrderService
 }
 ```
 
-Every failure path is a named, explicit branch — no exception catching needed at the
+Every failure path is a named, explicit branch. No exception catching needed at the
 call site.
 
 ## The controller layer
@@ -163,7 +163,7 @@ linearly.
 
 ## Richer errors
 
-Once you're hooked on the pattern, you'll want typed errors instead of raw strings —
+Once you're hooked on the pattern, you'll want typed errors instead of raw strings,
 especially when the caller needs to differentiate between "not found" and "unauthorized":
 
 ```csharp
@@ -197,7 +197,7 @@ Clean, exhaustive, no string parsing.
 
 ## When to still use exceptions
 
-The Result pattern isn't a replacement for all exceptions — only for **expected,
+The Result pattern isn't a replacement for all exceptions, only for **expected,
 domain-level failures**:
 
 | Use Result for | Still throw exceptions for |
@@ -207,7 +207,7 @@ domain-level failures**:
 | "Not found" in queries | Configuration missing at startup |
 | Permission checks | Truly unexpected states |
 
-Exceptions across infrastructure boundaries are fine — let them bubble up to middleware
+Exceptions across infrastructure boundaries are fine. Let them bubble up to middleware
 that logs and returns a 500. Don't `try/catch` EF Core `DbUpdateException` unless you
 have something specific to do with it.
 
