@@ -13,7 +13,7 @@
       <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:0"/>
     </linearGradient>
     <filter id="glow">
-      <feGaussianBlur stdDeviation="20" result="blur"/>
+      <feGaussianBlur stdDeviation="3" result="blur"/>
       <feMerge>
         <feMergeNode in="blur"/>
         <feMergeNode in="SourceGraphic"/>
@@ -38,10 +38,10 @@
   </g>
 
   <!-- Accent glow blob top-right -->
-  <circle cx="950" cy="120" r="200" fill="#3b82f6" opacity="0.06" filter="url(#glow)"/>
+  <circle cx="1050" cy="80" r="120" fill="#3b82f6" opacity="0.05"/>
 
   <!-- Accent glow blob bottom-left -->
-  <circle cx="200" cy="520" r="150" fill="#60a5fa" opacity="0.04" filter="url(#glow)"/>
+  <circle cx="100" cy="580" r="80" fill="#60a5fa" opacity="0.03"/>
 
   <!-- Code block card (right side) -->
   <rect x="720" y="140" width="410" height="300" rx="12" fill="url(#codeBlockBg)" stroke="#1e3a8a" stroke-width="1" opacity="0.9"/>
@@ -52,33 +52,17 @@
   <circle cx="788" cy="166" r="6" fill="#22c55e" opacity="0.7"/>
 
   <!-- Code content -->
-  <text x="748" y="210" font-family="'Fira Code', 'Courier New', monospace" font-size="14" fill="#9ca3af">// Your first AI-assisted .NET app</text>
+  <text x="748" y="210" font-family="monospace" font-size="13" fill="#6b7280">// Your first AI-assisted .NET app</text>
+  <text x="748" y="236" font-family="monospace" font-size="13" fill="#d1d5db"><tspan fill="#c084fc">var </tspan>thinking = <tspan fill="#22c55e">"Claude"</tspan>;</text>
+  <text x="748" y="262" font-family="monospace" font-size="13" fill="#d1d5db"><tspan fill="#c084fc">var </tspan>building = <tspan fill="#22c55e">"Copilot"</tspan>;</text>
+  <text x="748" y="298" font-family="monospace" font-size="13" fill="#6b7280">// Step 1: Requirements first</text>
+  <text x="748" y="324" font-family="monospace" font-size="13" fill="#6b7280">// Step 2: Data model</text>
+  <text x="748" y="350" font-family="monospace" font-size="13" fill="#6b7280">// Step 3: Build in phases</text>
+  <text x="748" y="376" font-family="monospace" font-size="13" fill="#6b7280">// Step 4: git commit -m "ship it"</text>
+  <text x="748" y="402" font-family="monospace" font-size="13" fill="#6b7280">// Step 5: Review everything</text>
 
-  <text x="748" y="240" font-family="'Fira Code', 'Courier New', monospace" font-size="14">
-    <tspan fill="#c084fc">var</tspan>
-    <tspan fill="#d1d5db"> thinking </tspan>
-    <tspan fill="#9ca3af">=</tspan>
-    <tspan fill="#22c55e"> "Claude"</tspan>
-    <tspan fill="#9ca3af">;</tspan>
-  </text>
-
-  <text x="748" y="270" font-family="'Fira Code', 'Courier New', monospace" font-size="14">
-    <tspan fill="#c084fc">var</tspan>
-    <tspan fill="#d1d5db"> building </tspan>
-    <tspan fill="#9ca3af">=</tspan>
-    <tspan fill="#22c55e"> "Copilot"</tspan>
-    <tspan fill="#9ca3af">;</tspan>
-  </text>
-
-  <text x="748" y="310" font-family="'Fira Code', 'Courier New', monospace" font-size="14" fill="#9ca3af">// Step 1: Requirements first</text>
-  <text x="748" y="340" font-family="'Fira Code', 'Courier New', monospace" font-size="14" fill="#9ca3af">// Step 2: Data model</text>
-  <text x="748" y="370" font-family="'Fira Code', 'Courier New', monospace" font-size="14" fill="#9ca3af">// Step 3: Build in phases</text>
-  <text x="748" y="400" font-family="'Fira Code', 'Courier New', monospace" font-size="14" fill="#9ca3af">// Step 4: git commit -m "ship it"</text>
-
-  <!-- Blinking cursor -->
-  <rect x="748" y="415" width="9" height="18" fill="#60a5fa" opacity="0.8">
-    <animate attributeName="opacity" values="0.8;0.2;0.8" dur="1.5s" repeatCount="indefinite"/>
-  </rect>
+  <!-- Cursor -->
+  <rect x="748" y="414" width="8" height="16" fill="#60a5fa" opacity="0.7"/>
 
   <!-- Main title area (left side) -->
   <text x="70" y="175" font-family="'Inter', system-ui, sans-serif" font-weight="700" font-size="22" fill="#60a5fa" letter-spacing="3">BEGINNER'S GUIDE</text>
