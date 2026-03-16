@@ -1,7 +1,7 @@
 ---
 title: "A Beginner's Guide to Building .NET Apps with AI"
 date: "2026-03-16"
-excerpt: "You've been writing C# for years. Now every tool wants you to talk to an AI. Here's how to actually start — without throwing out everything you already know."
+excerpt: "You've been writing C# for years. Now every tool wants you to talk to an AI. Here's how to actually start, without throwing out everything you already know."
 tags: ["AI", ".NET", "Agentic Development", "Developer Productivity", "Getting Started"]
 ---
 
@@ -9,19 +9,19 @@ You know how to build software. You've got years of C#, SQL Server, and Visual S
 
 They're right. But not in the way most of the hype suggests.
 
-AI isn't going to replace your architecture skills or your understanding of business domains. What it's going to do is eliminate the tedious parts of your day and give you back time for the work that actually matters. This post is about how to get started with that transition — practically, deliberately, and without abandoning the engineering discipline that got you here.
+AI isn't replacing your architecture skills or your understanding of business domains. It's eliminating the tedious parts of your day and giving you back time for the work that actually matters. This post is about how to get started with that, practically and deliberately, without abandoning the engineering discipline that got you here.
 
 I wrote a companion piece called [How to Start Building Apps with AI](/posts/how-i-actually-build-apps-with-ai) that covers my full workflow. This guide is the "start here" version. If you've never used an AI coding tool beyond asking ChatGPT a question, this is where to begin.
 
 ## Step 1: Pick Your Tools (Don't Overthink It)
 
-You need two things: a Thinking AI and a Building AI. That's it.
+You need two things: a Thinking AI and a Building AI.
 
-The **Thinking AI** is where you plan, brainstorm, and work through requirements before you write code. Claude (claude.ai or the desktop app) is what I use. ChatGPT and Gemini work too. The key is having a conversational AI where you can think out loud about what you're building without worrying about generating code yet.
+The **Thinking AI** is where you plan and work through requirements before you write code. Claude (claude.ai or the desktop app) is what I use. ChatGPT and Gemini work too. The point is having a conversational AI where you can think out loud about what you're building without worrying about generating code yet.
 
-The **Building AI** is whatever integrates into your editor and writes code alongside you. For .NET developers, your best options right now are GitHub Copilot inside Visual Studio (set the model to Claude if your license supports it), VS Code with the Claude extension, or Cursor (a VS Code fork built specifically for AI-assisted development). Any of these will get you started. You don't need all three.
+The **Building AI** is whatever integrates into your editor and writes code alongside you. For .NET developers, the best options right now are GitHub Copilot inside Visual Studio (set the model to Claude if your license supports it), VS Code with the Claude extension, or Cursor. Any of these will get you started. You don't need all three.
 
-If you're already in Visual Studio every day, start with Copilot. It's the smallest change to your existing workflow. You can explore other options once you've built the muscle memory.
+If you're already in Visual Studio every day, start with Copilot. Smallest change to your existing workflow. Explore other options once you've built the muscle memory.
 
 ## Step 2: Have the Conversation Before You Write Code
 
@@ -29,27 +29,27 @@ This is the step most developers skip, and it's the one that matters most.
 
 Open your Thinking AI and start a conversation about what you're building. Not "write me a controller." A real conversation. Tell it your stack. Tell it your constraints. Talk through the problem.
 
-Here's an example of what a good opening prompt looks like:
+Here's what a good opening prompt looks like:
 
 > I'm building an internal tool for tracking equipment maintenance schedules. The stack is .NET 10 with C#, SQL Server for the database, and Razor Pages for the frontend. The app needs to let technicians log completed maintenance, managers approve work orders, and the system should flag overdue items automatically. There are about 200 pieces of equipment across three facilities. What questions should I be thinking about for the data model?
 
-Notice what's happening here. You're not asking the AI to write code. You're asking it to think with you. You're providing context about your stack so it doesn't suggest PostgreSQL or React. You're describing the domain so it can ask intelligent follow-up questions.
+You're not asking the AI to write code. You're asking it to think with you. You're providing context about your stack so it doesn't suggest PostgreSQL or React. You're describing the domain so it can ask follow-up questions that actually matter.
 
-The AI will come back with questions about your entities, relationships, and edge cases. Things like: does equipment move between facilities? Can a work order cover multiple pieces of equipment? What does "overdue" actually mean — is it calendar days, operating hours, or something else?
+The AI will come back with questions about your entities, relationships, and edge cases. Does equipment move between facilities? Can a work order cover multiple pieces of equipment? What does "overdue" actually mean: calendar days, operating hours, or something else?
 
-This is requirements gathering, and the AI is surprisingly good at it. It'll ask questions you might not have considered because it's seen thousands of similar domains.
+This is requirements gathering, and AI turns out to be good at it. It asks questions you might not have considered because it's seen thousands of similar domains.
 
-Spend real time here. Twenty minutes of conversation with your Thinking AI will save you hours of rework later.
+Spend real time here. Twenty minutes of conversation with your Thinking AI saves you hours of rework later.
 
 ## Step 3: Get the Data Model Right First
 
-If you're a SQL Server developer, you already know this: the data model is the foundation. Everything else is built on top of it. AI doesn't change that principle — it just makes the conversation faster.
+If you're a SQL Server developer, you already know this: the data model is the foundation. Everything else is built on top of it. AI doesn't change that. It just makes the conversation faster.
 
-Take the output from your Thinking AI session and refine it into a concrete schema. Ask the AI to generate the CREATE TABLE statements. Review them carefully. Push back when something doesn't look right. Ask it why it chose a particular data type or why it added a specific index.
+Take the output from your Thinking AI session and refine it into a concrete schema. Ask the AI to generate the CREATE TABLE statements. Review them. Push back when something doesn't look right. Ask it why it chose a particular data type or why it added a specific index.
 
-Here's the kind of exchange that makes this step valuable. You might tell the AI: "I need a WorkOrder table that tracks maintenance requests. Each work order belongs to one piece of equipment, gets assigned to a technician, and goes through a status workflow: Submitted, Approved, In Progress, Completed." The AI generates a schema. You look at it and notice it used an NVARCHAR for Status instead of a lookup table. You push back: "I want a StatusType lookup table with an INT foreign key, not a string column." The AI adjusts, and now you've got a schema that matches how you actually build systems.
+Here's the kind of exchange that makes this step worth it. You tell the AI: "I need a WorkOrder table that tracks maintenance requests. Each work order belongs to one piece of equipment, gets assigned to a technician, and goes through a status workflow: Submitted, Approved, In Progress, Completed." The AI generates a schema. You look at it and notice it used an NVARCHAR for Status instead of a lookup table. You push back: "I want a StatusType lookup table with an INT foreign key, not a string column." The AI adjusts, and now you've got a schema that matches how you actually build systems.
 
-This is the kind of conversation where AI shines because it can explain its reasoning and adjust instantly when you disagree. You're not accepting defaults — you're having an architecture discussion at the speed of chat.
+That's the kind of conversation where AI is useful. You're not accepting defaults. You're having an architecture discussion at the speed of chat.
 
 Once you're happy with the schema, bring it into your Building AI. Paste the SQL into your editor and ask Copilot or Claude to generate the corresponding C# entities, your DbContext configuration (if you're using EF Core), or your Dapper mappings. Because you already established the data model in detail, the generated code will be dramatically better than if you'd just asked "generate a data access layer for an equipment tracking app."
 
@@ -57,39 +57,39 @@ The quality of the output is directly proportional to the quality of the input. 
 
 ## Step 4: Build in Small Phases, Not One Giant Prompt
 
-This is where experienced developers have an advantage. You already know how to break a project into layers. Do the same thing with AI.
+You already know how to break a project into layers. Do the same thing with AI.
 
 Don't paste a massive prompt that says "build me the entire app." The model will lose coherence. It'll generate a controller that references a service that doesn't exist yet. It'll make assumptions about your data layer that conflict with what it built two thousand tokens ago.
 
-Instead, work in phases. Each phase should be a focused unit of work:
+Work in phases. Each phase should be a focused unit of work:
 
 **Phase 1: Database schema and migrations.** Get your tables, constraints, and seed data in place. Commit it.
 
-**Phase 2: Data access layer.** Repositories, EF Core configurations, or Dapper queries — whatever pattern you use. Commit it.
+**Phase 2: Data access layer.** Repositories, EF Core configurations, or Dapper queries. Whatever pattern you use. Commit it.
 
 **Phase 3: Service layer.** Business logic, validation, workflow rules. This is where your Thinking AI conversation pays off because you've already mapped out the rules. Commit it.
 
 **Phase 4: API or controllers.** Wire up the endpoints. Commit it.
 
-**Phase 5: UI.** Razor Pages, MVC views, Blazor components — whatever you're building. Commit it.
+**Phase 5: UI.** Razor Pages, MVC views, Blazor components. Commit it.
 
 Each phase gets its own prompt, its own AI session, and its own git commit. This keeps the AI focused, keeps your code reviewable, and gives you rollback points when something goes sideways.
 
-There's another reason this matters: token limits. Every AI tool has a context window — a ceiling on how much text it can hold in its working memory at once. If you dump your entire application requirements into one prompt, the model starts losing coherence as it approaches that ceiling. It'll contradict itself. It'll forget a business rule it acknowledged ten paragraphs ago. I've watched models rewrite their own data access layer three times in a single session because they kept "improving" code they'd already generated.
+There's another reason this matters: token limits. Every AI tool has a context window, a ceiling on how much text it can hold in working memory at once. If you dump your entire application requirements into one prompt, the model starts losing coherence as it approaches that ceiling. It contradicts itself. It forgets a business rule it acknowledged ten paragraphs ago. I've watched models rewrite their own data access layer three times in a single session because they kept "improving" code they'd already generated.
 
-Phases eliminate this problem. Each phase starts fresh with a focused prompt and a clear objective. The model stays sharp because it's only thinking about one layer at a time.
+Phases fix this. Each phase starts fresh with a focused prompt and a clear objective. The model stays sharp because it's only thinking about one layer at a time.
 
 ## Step 5: Set Up Git Before the AI Touches Anything
 
-I cannot stress this enough. Create a git repo before your first AI-generated line of code. If you already have one, make sure you're on a clean branch.
+Create a git repo before your first AI-generated line of code. If you already have one, make sure you're on a clean branch.
 
-AI will occasionally do things you didn't ask for. It'll rename variables. It'll refactor a method you told it to leave alone. It'll "improve" something that was already working. When that happens — and it will — you need to be able to see exactly what changed and roll it back.
+AI will occasionally do things you didn't ask for. It renames variables. It refactors a method you told it to leave alone. It "improves" something that was already working. When that happens, and it will, you need to be able to see exactly what changed and roll it back.
 
 After every AI coding session, run `git diff`. Read the output. Make sure the changes are scoped to what you asked for. If the AI touched files it shouldn't have, revert those files. Then commit the good changes with a clear message.
 
 This isn't optional. This is the safety net that lets you move fast without worrying about the AI breaking something silently.
 
-If you're not comfortable with `git log`, `git reset`, and `git checkout`, spend an afternoon with them before you start. You will need them.
+If you're not comfortable with `git log`, `git reset`, and `git checkout`, spend an afternoon learning them before you start. You will need them.
 
 ## Step 6: Review Everything the AI Writes
 
@@ -99,11 +99,11 @@ You are still the engineer. The AI is a very fast junior developer who never get
 
 Review AI-generated code the same way you'd review a pull request from a new team member. Check the logic against your business rules. Verify the SQL is using the right indexes. Make sure the error handling isn't just swallowing exceptions. Run your tests.
 
-The developers who get the most value from AI aren't the ones who generate code the fastest. They're the ones who review it the most carefully.
+The developers getting the most out of AI aren't the ones generating code fastest. They're the ones reviewing it most carefully.
 
 ## Step 7: Learn Prompt Patterns That Work for .NET
 
-Once you're comfortable with the basic workflow, you'll start noticing patterns in what makes a good prompt versus a mediocre one. Here are a few that I've found work well in the .NET ecosystem.
+Once you're comfortable with the basic workflow, you'll start noticing what makes a good prompt versus a mediocre one. A few that work well in the .NET ecosystem:
 
 **Always specify your framework version.** ".NET 10 with C# 13" prevents the AI from generating code with deprecated APIs or older patterns.
 
@@ -113,27 +113,27 @@ Once you're comfortable with the basic workflow, you'll start noticing patterns 
 
 **Ask for one thing at a time.** "Generate the repository interface and implementation for the Equipment entity using Dapper" is a better prompt than "generate the data access layer." Specificity wins.
 
-**Include constraints.** "This runs on Azure SQL with a max DTU of 100" or "the users are on a corporate network with no internet access" are the kinds of constraints that change the generated code meaningfully. Don't assume the AI will infer them.
+**Include constraints.** "This runs on Azure SQL with a max DTU of 100" or "the users are on a corporate network with no internet access" are the kinds of constraints that change the generated code in ways that matter. Don't assume the AI will infer them.
 
 ## What You'll Notice After Your First Project
 
-Something will click about two or three phases into your first AI-assisted project, and it's worth naming so you recognize it when it happens.
+Something clicks about two or three phases into your first AI-assisted project.
 
-You'll realize the AI didn't change what you do. You still gathered requirements. You still designed a data model. You still made architecture decisions about patterns and layers. You still reviewed code and caught issues. All of that is the same work you've been doing for years.
+You realize the AI didn't change what you do. You still gathered requirements. You still designed a data model. You still made architecture decisions about patterns and layers. You still reviewed code and caught issues. All of that is the same work you've been doing for years.
 
-What changed is where your time went. The hours you used to spend writing boilerplate — wiring up dependency injection, scaffolding CRUD endpoints, writing the fifteenth repository implementation that looks identical to the other fourteen — those hours collapsed into minutes. The time you saved went back into the work that actually requires a senior developer: understanding the domain, making design trade-offs, catching edge cases, and verifying that the final product does what the business needs.
+What changed is where your time went. The hours you used to spend writing boilerplate, wiring up dependency injection, scaffolding CRUD endpoints, writing the fifteenth repository implementation that looks identical to the other fourteen, those collapsed into minutes. The time you saved went back into the work that actually requires a senior developer: understanding the domain, making design trade-offs, catching edge cases, and verifying that the final product does what the business needs.
 
-That's the real value proposition. Not "AI writes code so you don't have to." It's "AI handles the repetitive implementation so you can focus on the engineering."
+That's the actual value. Not "AI writes code so you don't have to." It's "AI handles the repetitive implementation so you can focus on the engineering."
 
 ## Where to Go From Here
 
-This workflow — think first, model the data, build in phases, commit often, review everything — will carry you through your first AI-assisted project and your fiftieth. The tools will change. The models will get better. The workflow will evolve. But the fundamentals are the same ones you've been practicing your entire career: understand the problem, design the solution, build it carefully, and verify it works.
+Think first, model the data, build in phases, commit often, review everything. That workflow will carry you through your first AI-assisted project and your fiftieth. The tools will change. The models will get better. But the fundamentals are the same ones you've been practicing your entire career: understand the problem, design the solution, build it carefully, and verify it works.
 
 The biggest mistake I see experienced developers make isn't using AI poorly. It's waiting too long to start because the hype makes it sound like you need to learn a completely new way of working. You don't. You need to add a new tool to the process you already have.
 
 Start with one small project. Something low-stakes. A utility app, an internal tool, a prototype. Use the Thinking AI to plan it. Use the Building AI to generate code. Review everything. Commit often. See how it feels.
 
-You'll adapt the workflow to fit the way you think. Everyone does. But you have to start to get there.
+You'll adapt the workflow to fit how you think. Everyone does. But you have to start to get there.
 
 ---
 
