@@ -1,0 +1,212 @@
+---
+title: "Stop Paying the Marketing Tax: Auditing Your Claude Code Plugin Context"
+date: "2026-03-23"
+excerpt: "I found 12 marketing skills in my .NET development environment. Here's how they got there and exactly how to remove them."
+tags: ["Claude Code", "AI", ".NET", "Developer Productivity", "Context Window"]
+series: "AI Context Engineering for .NET Teams"
+seriesOrder: 1
+---
+
+## TL;DR
+
+I was burning ~550 tokens per session on marketing plugins I never installed intentionally and didn't need. A 10-minute audit cut my Claude Code baseline context from 33k to 30k tokens, recovered ~3,000 tokens of free headroom, and eliminated noise that was auto-triggering the wrong skills mid-session. Here's exactly how to do it.
+
+---
+
+## Background: What Is the Context Window and Why Should You Care?
+
+If you're using Claude Code for serious development work (large codebases, multi-agent orchestration, long conversion sessions), the context window is your most precious resource.
+
+Claude Code (running Opus 4.6) has a 200k token context window. That sounds enormous until you realize your baseline overhead is already consuming a significant chunk of it before you write a single line of code.
+
+That baseline includes:
+
+- **System prompt:** Claude's built-in instructions
+- **System tools:** built-in tool definitions (bash, file ops, etc.)
+- **MCP tools:** any Model Context Protocol servers you've connected
+- **Custom agents:** your `/agents` definitions
+- **Memory files:** your `CLAUDE.md` files
+- **Skills:** your `/skills` definitions
+- **Plugins:** third-party skill bundles installed into Claude Code
+
+Every token of overhead is a token that *isn't* available for your actual code, conversation history, and file context. On a large project like mine (195k+ lines of legacy VB.NET being converted to ASP.NET Core Razor Pages), this matters.
+
+---
+
+## Step 1: Run the Audit
+
+The first thing to do is see exactly what's consuming your context. In Claude Code, run:
+
+```
+/context
+```
+
+This gives you a detailed breakdown by category. Mine looked like this:
+
+```
+claude-opus-4-6 · 33k/200k tokens (16%)
+
+System prompt:    3.6k tokens  (1.8%)
+System tools:    18.4k tokens  (9.2%)
+MCP tools:         365 tokens  (0.2%)
+Custom agents:     2.0k tokens  (1.0%)
+Memory files:      7.4k tokens  (3.7%)
+Skills:            1.1k tokens  (0.5%)
+Messages:            8 tokens  (0.0%)
+Free space:       134k          (67.1%)
+Autocompact buffer: 33k         (16.5%)
+```
+
+At first glance, 16% used looks fine. The surprise was in the Plugin section further down the output:
+
+```
+Plugin
+└ performance-analytics: 77 tokens
+└ content-creation: 76 tokens
+└ campaign-planning: 75 tokens
+└ competitive-analysis: 73 tokens
+└ brand-voice: 68 tokens
+└ marketing:seo-audit: 36 tokens
+└ marketing:draft-content: 31 tokens
+└ marketing:performance-report: 31 tokens
+└ marketing:campaign-plan: 30 tokens
+└ marketing:email-sequence: 30 tokens
+└ marketing:brand-review: 25 tokens
+└ marketing:competitive-brief: 25 tokens
+```
+
+**12 marketing skills.** Installed. In my .NET development environment.
+
+---
+
+## Step 2: Identify the Culprits
+
+I didn't install these manually. After some digging, I found they came from Anthropic's own `knowledge-work-plugins/marketing` package, a plugin **primarily designed for Cowork** (Anthropic's agentic desktop application) that also installs into Claude Code.
+
+Here's what each group was actually doing:
+
+### The 5 Auto-Triggering Skills
+
+| Skill | Purpose |
+|---|---|
+| `performance-analytics` | Marketing performance reports, campaign metrics |
+| `content-creation` | Marketing copy, SEO content, channel templates |
+| `campaign-planning` | Campaign frameworks, content calendars, budgets |
+| `competitive-analysis` | Competitor research, messaging comparison, battlecards |
+| `brand-voice` | Brand voice docs, style guide enforcement |
+
+These weren't just sitting dormant. They were **auto-triggered**. Claude Code scans skill descriptions at session start and loads the ones that appear relevant. During a session where I'm discussing things like "application architecture" or "content strategy for screens," these marketing skills were potentially activating alongside my development tools.
+
+### The 7 Slash Commands
+
+The `marketing:` prefixed skills added explicit commands: `/seo-audit`, `/draft-content`, `/performance-report`, `/campaign-plan`, `/email-sequence`, `/brand-review`, `/competitive-brief`.
+
+None of these have any place in a Razor Pages migration project.
+
+---
+
+## Step 3: Understand the Real Cost
+
+Raw token count understates the problem. There are two costs:
+
+**1. Baseline token burn.** Every session starts with ~550 tokens consumed by irrelevant skills. On a long agentic run with context compaction, every token of unnecessary overhead compounds.
+
+**2. Wrong skill activation.** Skills auto-activate based on description matching. Marketing skills with keywords like "content," "performance," "analysis," and "strategy" have meaningful overlap with software development vocabulary. There's a real risk of Claude reaching for a marketing skill when you meant something technical.
+
+---
+
+## Step 4: Find the Plugin Name
+
+Before uninstalling, confirm the exact registered name:
+
+```
+/plugin list
+```
+
+This shows all installed plugins with their exact names. Look for anything with "marketing" in the name.
+
+---
+
+## Step 5: Uninstall
+
+One command:
+
+```
+/plugin uninstall marketing
+```
+
+If that returns "not found," try the common variants:
+
+```
+/plugin uninstall marketing-skills
+/plugin uninstall marketing-suite
+```
+
+Only one will succeed. You're just trying each likely name until you find it.
+
+**If the CLI uninstall doesn't work**, fall back to manual removal:
+
+```
+# Windows
+C:\Users\<you>\.claude\plugins\
+
+# WSL or Mac/Linux
+~/.claude/plugins/
+```
+
+Delete the plugin folder directly, then restart Claude Code.
+
+---
+
+## Step 6: Verify
+
+Run `/context` again immediately after:
+
+```
+/context
+```
+
+The Plugin section should be completely gone from the output. You should also see a small token reduction in the totals.
+
+---
+
+## Results
+
+Here's the before and after:
+
+| Metric | Before | After |
+|---|---|---|
+| Total tokens used | 33k (16%) | 30k (15%) |
+| Plugin tokens | ~550 | 0 |
+| Custom agents | 2.0k | 774 tokens |
+| Skills | 1.1k | 482 tokens |
+| **Net recovered** | n/a | **~3,000 tokens** |
+
+The cleanup also surfaced several user-level agents that weren't relevant to my current project (`api-architect`, `javascript-expert`, `date-checker`, `git-workflow`), which I removed at the same time. That accounts for the larger-than-expected agent token reduction.
+
+---
+
+## What Still Has Room to Shrink
+
+After this cleanup, my biggest remaining lever is the **project `CLAUDE.md`** at 7.3k tokens. That's the single largest controllable line item, larger than all my custom agents and skills combined.
+
+Strategies I'm evaluating for CLAUDE.md optimization:
+
+- **Archive completed screen context:** Notes about screens already converted don't need to be in every session's context
+- **Move reference material to Skills:** Static lookup content (naming conventions, component patterns) belongs in skills that load on demand, not permanently in CLAUDE.md
+- **Lean hierarchy:** Break the monolithic CLAUDE.md into a lean root file that references more specific files, letting Claude Code's progressive disclosure load only what's needed
+
+If I can get CLAUDE.md from 7.3k to ~4k, my total baseline drops from 30k to ~27k, which opens up significantly more headroom for complex multi-file conversion sessions.
+
+---
+
+## The Broader Lesson
+
+Claude Code's plugin and skills ecosystem is maturing fast. With community marketplaces, Anthropic's own knowledge-work plugins, and third-party tool suites all installing into the same `~/.claude/` directory, **context bloat from unintended installs is a real problem**, especially if you use Claude in multiple contexts (development, Cowork, etc.).
+
+Get into the habit of running `/context` at the start of new projects and periodically during long engagements. Think of it the same way you'd think about reviewing your npm `node_modules` or NuGet packages. Things accumulate, and periodic audits keep the environment clean.
+
+Your context window is your workspace. Keep it clean.
+
+**Next in this series:** We took the CLAUDE.md from 7.3k tokens to under 2k by rearchitecting from a monolith to a skills-based system that cut always-loaded context by 82%. [Read Part 2 →]
+
