@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#030712"/>
+      <stop offset="100%" style="stop-color:#0f172a"/>
+    </linearGradient>
+    <linearGradient id="codeBlockBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e293b"/>
+      <stop offset="100%" style="stop-color:#111827"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Subtle grid -->
+  <g opacity="0.04">
+    <line x1="200" y1="0" x2="200" y2="630" stroke="#60a5fa" stroke-width="1"/>
+    <line x1="400" y1="0" x2="400" y2="630" stroke="#60a5fa" stroke-width="1"/>
+    <line x1="600" y1="0" x2="600" y2="630" stroke="#60a5fa" stroke-width="1"/>
+    <line x1="800" y1="0" x2="800" y2="630" stroke="#60a5fa" stroke-width="1"/>
+    <line x1="1000" y1="0" x2="1000" y2="630" stroke="#60a5fa" stroke-width="1"/>
+    <line x1="0" y1="126" x2="1200" y2="126" stroke="#60a5fa" stroke-width="1"/>
+    <line x1="0" y1="252" x2="1200" y2="252" stroke="#60a5fa" stroke-width="1"/>
+    <line x1="0" y1="378" x2="1200" y2="378" stroke="#60a5fa" stroke-width="1"/>
+    <line x1="0" y1="504" x2="1200" y2="504" stroke="#60a5fa" stroke-width="1"/>
+  </g>
+
+  <!-- Glow accents - warmer amber for the "danger" theme -->
+  <circle cx="1050" cy="80" r="120" fill="#f59e0b" opacity="0.04"/>
+  <circle cx="100" cy="580" r="80" fill="#60a5fa" opacity="0.03"/>
+
+  <!-- Code block card -->
+  <rect x="710" y="110" width="430" height="380" rx="12" fill="url(#codeBlockBg)" stroke="#1e3a8a" stroke-width="1" opacity="0.9"/>
+
+  <!-- Window dots -->
+  <circle cx="738" cy="138" r="6" fill="#ef4444" opacity="0.7"/>
+  <circle cx="758" cy="138" r="6" fill="#eab308" opacity="0.7"/>
+  <circle cx="778" cy="138" r="6" fill="#22c55e" opacity="0.7"/>
+
+  <!-- Bool vs tuple comparison -->
+  <text x="738" y="174" font-family="monospace" font-size="12" fill="#6b7280">// CLAUDE.md said:</text>
+  <text x="738" y="196" font-family="monospace" font-size="12" fill="#f87171">Task&lt;bool&gt; DeleteBargeAsync(int id)</text>
+
+  <line x1="738" y1="210" x2="1110" y2="210" stroke="#374151" stroke-width="1" stroke-dasharray="4,4"/>
+
+  <text x="738" y="232" font-family="monospace" font-size="12" fill="#6b7280">// We actually ship:</text>
+  <text x="738" y="254" font-family="monospace" font-size="12" fill="#4ade80">Task&lt;(bool success,</text>
+  <text x="738" y="274" font-family="monospace" font-size="12" fill="#4ade80">      bool softDeleted)&gt;</text>
+  <text x="738" y="296" font-family="monospace" font-size="12" fill="#4ade80">  DeleteBargeAsync(int id)</text>
+
+  <line x1="738" y1="312" x2="1110" y2="312" stroke="#374151" stroke-width="1" stroke-dasharray="4,4"/>
+
+  <!-- More patterns -->
+  <text x="738" y="336" font-family="monospace" font-size="11" fill="#6b7280">// Also wrong in the memory file:</text>
+  <text x="738" y="356" font-family="monospace" font-size="11" fill="#f87171">type="time"           // native picker</text>
+  <text x="738" y="374" font-family="monospace" font-size="11" fill="#4ade80">type="text" class="time"  // ours</text>
+  <line x1="738" y1="386" x2="1110" y2="386" stroke="#374151" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="738" y="406" font-family="monospace" font-size="11" fill="#f87171">ViewBag.Items = items;   // dynamic</text>
+  <text x="738" y="424" font-family="monospace" font-size="11" fill="#4ade80">model.Items = items;     // typed</text>
+  <line x1="738" y1="436" x2="1110" y2="436" stroke="#374151" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="738" y="460" font-family="monospace" font-size="11" fill="#6b7280">// All compiled. None flagged in CI.</text>
+  <text x="738" y="480" font-family="monospace" font-size="11" fill="#fbbf24">// 5 patterns. 2 hrs to find them.</text>
+
+  <!-- Cursor -->
+  <rect x="738" y="488" width="8" height="14" fill="#60a5fa" opacity="0.7"/>
+
+  <!-- Series label -->
+  <text x="70" y="148" font-family="'Inter', system-ui, sans-serif" font-weight="700" font-size="13" fill="#60a5fa" letter-spacing="3">AI CONTEXT ENGINEERING · PART 3 OF 4</text>
+  <rect x="70" y="160" width="80" height="3" rx="1.5" fill="#3b82f6" opacity="0.6"/>
+
+  <!-- Title -->
+  <text x="70" y="235" font-family="'Inter', system-ui, sans-serif" font-weight="700" font-size="50" fill="#f3f4f6">When Your AI</text>
+  <text x="70" y="297" font-family="'Inter', system-ui, sans-serif" font-weight="700" font-size="50" fill="#f3f4f6">Memory File</text>
+  <text x="70" y="359" font-family="'Inter', system-ui, sans-serif" font-weight="700" font-size="50" fill="#f87171">Lies</text>
+
+  <!-- Subtitle -->
+  <text x="70" y="402" font-family="'Inter', system-ui, sans-serif" font-weight="400" font-size="16" fill="#9ca3af">5 outdated patterns we were shipping to production.</text>
+
+  <!-- Tags -->
+  <rect x="70" y="448" width="115" height="32" rx="16" fill="none" stroke="#2563eb" stroke-width="1.5" opacity="0.7"/>
+  <text x="128" y="469" font-family="'Inter', system-ui, sans-serif" font-weight="500" font-size="13" fill="#60a5fa" text-anchor="middle">Claude Code</text>
+
+  <rect x="200" y="448" width="72" height="32" rx="16" fill="none" stroke="#2563eb" stroke-width="1.5" opacity="0.7"/>
+  <text x="236" y="469" font-family="'Inter', system-ui, sans-serif" font-weight="500" font-size="13" fill="#60a5fa" text-anchor="middle">.NET</text>
+
+  <rect x="287" y="448" width="110" height="32" rx="16" fill="none" stroke="#2563eb" stroke-width="1.5" opacity="0.7"/>
+  <text x="342" y="469" font-family="'Inter', system-ui, sans-serif" font-weight="500" font-size="13" fill="#60a5fa" text-anchor="middle">Code Quality</text>
+
+  <!-- Bottom bar -->
+  <line x1="70" y1="560" x2="1130" y2="560" stroke="#1e293b" stroke-width="1"/>
+  <text x="70" y="590" font-family="'Inter', system-ui, sans-serif" font-weight="700" font-size="16" fill="#d1d5db">romano.io</text>
+  <text x="163" y="590" font-family="'Inter', system-ui, sans-serif" font-weight="400" font-size="14" fill="#6b7280">  ·  AI, .NET &amp; Agentic Development</text>
+  <text x="1130" y="590" font-family="'Inter', system-ui, sans-serif" font-weight="400" font-size="14" fill="#6b7280" text-anchor="end">March 25, 2026</text>
+</svg>
