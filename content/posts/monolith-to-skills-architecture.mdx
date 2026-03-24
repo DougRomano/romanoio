@@ -26,7 +26,7 @@ Each time Claude got something wrong, the instinct was the same: add a rule. The
 
 ## Phase Two: The Memory File Explosion
 
-The first attempt to fix the monolith was to break it into focused memory files. We extracted domain-specific patterns into `.specify/memory/`:
+The first attempt to fix the monolith was to break it into focused memory files. We extracted domain-specific patterns into `.specify/memory/` under our [GitHub Spec Kit](https://github.com/github/spec-kit) setup—spec-driven development with Jira tasks tied to the same specification flow:
 
 ```
 .specify/memory/
@@ -42,6 +42,8 @@ The first attempt to fix the monolith was to break it into focused memory files.
 ├── search-grid-datatables-conversion.md       (75 lines)
 └── ui-authorization-pattern.md                (96 lines)
 ```
+
+That structure worked great when we stayed inside the SpecKit specify, plan, tasks, implement, and further review all pointed at the same truth. It broke down when opening Cursor instead: without an explicit spec in play, we were stuck with whatever files that developer chose as examples in the chat. If they didn't attach or reference anything, the answer came down to the Cursor model's best guess against the repo and whatever was in the prompt. No guarantee it matched how we actually build features. That's the lesson we kept relearning, no matter what problem you're trying to solve, start with a plan first, a short design note, even a bullet list of constraints so the model isn't guessing.
 
 **11 files, 561 lines** of extracted patterns. Knowledge was organized by topic. But three new problems emerged immediately.
 
