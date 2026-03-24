@@ -1,0 +1,242 @@
+---
+title: "From Monolith to Skills Architecture: An 82% Reduction in Always-Loaded AI Context"
+date: "2026-03-24"
+excerpt: "A 564-line CLAUDE.md became a 23-line router. Eleven memory files became seven on-demand skills. Always-loaded context dropped 82%. The procedural knowledge didn't disappear. It grew. Here's the full arc."
+tags: ["Claude Code", "AI", ".NET", "Context Window", "Developer Productivity", "Software Architecture"]
+series: "AI Context Engineering for .NET Teams"
+seriesOrder: 2
+---
+
+## TL;DR
+
+Over several months of AI-assisted development on a production .NET monorepo, our always-loaded context evolved through three distinct phases and ended up 82% smaller than where it started. A 564-line monolithic `CLAUDE.md` became a 23-line router. Eleven scattered memory files became seven focused on-demand skills. A 344-line constitution became a lean 211-line principles document. The procedural knowledge didn't disappear. It actually grew. It just moved from "always burning tokens" to "loaded only when needed."
+
+Here's the full arc.
+
+---
+
+## Phase One: The Monolith
+
+When we first adopted Claude Code for BargeOps (a .NET monorepo with an ASP.NET Core Web API using Dapper and SQL Server, plus an MVC/Razor Pages UI), we did what most teams do: we put everything into `CLAUDE.md`.
+
+Every pattern. Every convention. Every edge case we'd been bitten by. The file grew to **564 lines** covering architecture, repository patterns, ListQuery pagination, delete and soft-delete behavior, audit fields, UI standards, DataTables configuration, authorization, transactions, exception types, DTO flow, XSS prevention, and more.
+
+The content was correct. All hard-won from real mistakes. The problem was **cost**. Every conversation, every prompt, loaded all 564 lines into context whether the task needed it or not. Asking Claude to fix a typo in a Razor view burned the same token budget as a full entity scaffolding operation.
+
+Each time Claude got something wrong, the instinct was the same: add a rule. The file became an archaeological record of every mistake, with no mechanism to expire or supersede old entries.
+
+---
+
+## Phase Two: The Memory File Explosion
+
+The first attempt to fix the monolith was to break it into focused memory files. We extracted domain-specific patterns into `.specify/memory/`:
+
+```
+.specify/memory/
+├── add-not-create.md                          (26 lines)
+├── api-code-quality-patterns.md               (71 lines)
+├── datatables-api-property-names.md           (67 lines)
+├── edit-form-active-first-row.md              (36 lines)
+├── handlelistrequest-pattern.md               (20 lines)
+├── listquery-sortable-filterable-pattern.md   (61 lines)
+├── no-post-save-toast.md                      (21 lines)
+├── rootobject-apiresponse-standard.md         (55 lines)
+├── search-add-button-text.md                  (33 lines)
+├── search-grid-datatables-conversion.md       (75 lines)
+└── ui-authorization-pattern.md                (96 lines)
+```
+
+**11 files, 561 lines** of extracted patterns. Knowledge was organized by topic. But three new problems emerged immediately.
+
+**Discovery was terrible.** Claude had no reliable way to know which memory file was relevant to a given task. References were scattered across `CLAUDE.md`, cursor rules, and the files themselves.
+
+**Duplication crept back.** Cursor rules started duplicating content from memory files so that glob-scoped context would actually contain the patterns needed. Six cursor rules accumulated **228 lines** of near-duplicate guidance.
+
+**No clear hierarchy.** When the constitution, a memory file, a cursor rule, and `CLAUDE.md` all said something slightly different about ListQuery patterns, which one was authoritative? We'd created a consistency problem on top of the bloat problem.
+
+The total always-loaded surface was actually *larger* than the original monolith.
+
+---
+
+## Phase Three: Skills Architecture
+
+The breakthrough came from a concept Claude Code already supports natively: **Skills**, slash-command-invoked markdown files loaded *on demand*, not on every conversation.
+
+### The Core Insight: Principles vs. Procedures
+
+The guidance in every AI context file falls into two categories:
+
+| Category | When needed | Token cost model |
+|---|---|---|
+| **Principles** | Every conversation | Must be minimal |
+| **Procedures** | Specific tasks | Can be large, if loaded on demand |
+
+"All columns must be sortable" is a principle. The 50-line code sample showing how to wire `[Sortable]` attributes on models, configure `HandleListRequestAsync<TDto, TModel>()`, and set up the DataTables JS side is a procedure.
+
+Principles belong in always-loaded context. Procedures belong in skills.
+
+### The Refactoring
+
+We consolidated 11 memory files and a 100-line monolithic `.claude/SKILL.md` into **seven focused skills**:
+
+```
+.claude/skills/
+├── api-patterns/SKILL.md        (469 lines): ListQuery, delete, audit, auth
+├── datatables/SKILL.md          (192 lines): camelCase, column config, grid wiring
+├── ui-conversion/SKILL.md       (138 lines): buttons, layout, forms, modals
+│   └── references/
+│       ├── ui-standards-detailed.md  (133 lines)
+│       └── screen-inventory.md       (61 lines)
+├── git-workflow/SKILL.md         (41 lines): branches, commits, PRs
+├── playwright/SKILL.md           (72 lines): test standards, naming, coverage
+├── build/SKILL.md                (51 lines): build/run/test commands
+└── repo-docs/SKILL.md            (34 lines): file location whitelist
+```
+
+Each skill is invoked with a slash command (`/api-patterns`, `/ui-conversion`, `/datatables`, etc.) and loads only when the developer asks for it.
+
+### CLAUDE.md Becomes a 23-Line Router
+
+```markdown
+## Key References (router)
+
+See documentation hierarchy at the top of constitution.md
+for single-source-of-truth by topic.
+
+- Architecture principles:  constitution.md
+- UI v2:                    /ui-conversion skill
+- API patterns:             /api-patterns skill
+- DataTables:               /datatables skill
+- Playwright:               /playwright skill
+- Build:                    /build skill
+- Docs location:            /repo-docs skill
+- Git workflow:             /git-workflow skill
+```
+
+The constitution was trimmed from 344 to **211 lines**, principles only, with pointers to skills for procedural detail. Every section that used to contain a code sample now contains a one-liner:
+
+> **Examples and patterns:** `.claude/skills/api-patterns/SKILL.md` (section *Service Layer with Validation*)
+
+### Cursor Rules as Thin Reminders
+
+Cursor rules dropped from **228 lines** to **92 lines** of glob-scoped reminders. The entire `ui-standards.mdc` after refactoring:
+
+```markdown
+---
+globs: "**/BargeOps.UI/Views/**/*,**/BargeOps.UI/wwwroot/js/**/*"
+---
+
+# UI Standards (BargeOps Admin v2)
+
+Single source of truth: constitution.md.
+Full procedural detail: /ui-conversion skill.
+DataTables JS: /datatables skill.
+
+## Quick reminders (glob-scoped)
+
+- Buttons: Search -> Clear -> Add [Entity]; one row, top-left
+- Layout: Search max 4 across; Create/Edit one column
+- Grids: ListQuery + shared DataTable helpers; camelCase column data
+- ViewModels: MVVM; no ViewBag/ViewData
+```
+
+5-10 lines. Remind, don't teach.
+
+---
+
+## The Token Math
+
+### Always-loaded context (every conversation)
+
+| Component | Before | After | Change |
+|---|---|---|---|
+| `CLAUDE.md` | 564 lines | 23 lines | **-96%** |
+| `constitution.md` | 344 lines | 211 lines | **-39%** |
+| Memory files (11) | 561 lines | 0 lines | **-100%** |
+| Cursor rules (6) | 228 lines | 92 lines | **-60%** |
+| `.claude/SKILL.md` | 100 lines | 0 lines | **-100%** |
+| **Total** | **~1,797 lines** | **~326 lines** | **-82%** |
+
+### On-demand context (loaded only when invoked)
+
+| Component | Lines |
+|---|---|
+| 7 skill files | 997 lines |
+| 2 reference files | 194 lines |
+| **Total on-demand** | **1,191 lines** |
+
+The procedural knowledge didn't disappear. It actually *grew* as we consolidated and filled gaps. A typical conversation that doesn't invoke any skills now loads **~326 lines** instead of **~1,797**.
+
+Measured in Claude Code's `/context` output: baseline dropped from **33k tokens (16%)** to **25k tokens (13%)**, with 142k tokens (71%) now free versus 134k before.
+
+---
+
+## The Documentation Hierarchy
+
+The architecture enforces a clear hierarchy with explicit conflict resolution:
+
+```
+CLAUDE.md (23-line router)
+  |
+  +--> constitution.md (principles & governance -- 211 lines)
+         |
+         +--> /ui-conversion skill    (UI procedures)
+         +--> /api-patterns skill     (API procedures)
+         +--> /datatables skill       (grid procedures)
+         +--> /git-workflow skill
+         +--> /playwright skill
+         +--> /build skill
+         +--> /repo-docs skill
+  |
+  +--> .cursor/rules/*.mdc (glob-scoped thin reminders)
+         |
+         +--> Point to skills (never duplicate)
+```
+
+**Conflict resolution is explicit:** constitution beats skills, skills beat cursor rules. Every file knows its place in the hierarchy and says so in its header:
+
+```markdown
+**Documentation hierarchy:** constitution.md holds principles.
+**This skill** holds API implementation recipes. If a principle
+in the constitution conflicts with a snippet here, follow the
+constitution and open a task to align this skill.
+```
+
+The constitution carries a version number (`1.10.0`) and ratification date. Skills evolve independently as long as they stay within constitutional principles.
+
+---
+
+## What We Learned
+
+**1. The always-on tax compounds.** Every line in `CLAUDE.md` loads into every conversation. At scale, this isn't just a cost issue, it's a signal-to-noise issue. When the AI has 1,800 lines of context, important rules get diluted. When it has 326 lines, the principles actually land.
+
+**2. Memory files without discovery are write-only storage.** We wrote 11 memory files and the AI rarely found the right one at the right time. Skills solve discovery because they're explicitly invoked. The developer (or the AI, reading the router) knows exactly when to load `/api-patterns` vs. `/datatables`.
+
+**3. Cursor rules should remind, not teach.** Glob-scoped rules are powerful for reminders but wasteful for procedures. Tell the AI *what* to remember and *where* to look, not *how* to do it.
+
+**4. Separate principles from procedures.** Principles are compact, stable, and relevant to every task. Procedures are verbose, evolving, and task-specific. They belong in different loading strategies.
+
+**5. Explicit hierarchy prevents drift.** When four places mentioned ListQuery patterns, they drifted apart within weeks. Now there's one authoritative source per pattern and everything else is a pointer. Drift is structurally impossible.
+
+---
+
+## Applying This to Your Project
+
+1. **Audit your `CLAUDE.md`.** If it's over 100 lines, you probably have procedures masquerading as principles.
+2. **Count your always-loaded files.** Memory files, cursor rules, global instructions. Every line that loads without being asked for is your per-conversation tax.
+3. **Extract procedures into skills.** Any guidance block with code samples or step-by-step instructions is a candidate. Name it after the *task*, not the *topic*.
+4. **Make `CLAUDE.md` a router.** Project overview, non-negotiables, and pointers. Nothing else.
+5. **Add hierarchy declarations.** Every file should know its place and say so explicitly.
+6. **Thin your cursor rules.** 5-10 lines per rule. Remind, don't teach.
+
+---
+
+*Net diff for this refactoring: 1,335 insertions, 1,575 deletions across 32 files. We added more procedural detail than we had before, deleted 11 memory files, and cut always-loaded context from ~1,800 lines to ~326. The knowledge grew. The cost shrank.*
+
+**Next in this series:** The memory file refactoring solved the bloat problem, but it exposed a darker issue. Some of those old patterns were flat-out wrong, and we'd been shipping them to production. *Part 3 — coming soon.*
+
+[← Part 1: Stop Paying the Marketing Tax](/blog/stop-paying-the-marketing-tax)
+
+---
+
+*Doug is a .NET architect at CSG Solutions leading the BargeOps modernization project, converting 195k+ lines of legacy VB.NET WinForms to ASP.NET Core Razor Pages using Claude Code's agent system. He writes about AI-assisted development, context management, and enterprise modernization patterns.*

@@ -7,7 +7,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeSlug from 'rehype-slug';
 import rehypeAutolinkHeadings from 'rehype-autolink-headings';
-import { getPostBySlug, getAllPosts } from '@/lib/posts';
+import { getPostBySlug, getAllPosts, getSeriesNavigation } from '@/lib/posts';
 
 // Syntax highlighting theme (GitHub Dark)
 import 'highlight.js/styles/github-dark.css';
@@ -55,6 +55,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default function PostPage({ params }: Props) {
   const post = getPostBySlug(params.slug);
   if (!post) notFound();
+
+  const seriesNav = getSeriesNavigation(params.slug);
 
   const mdxOptions = {
     remarkPlugins: [remarkGfm],
@@ -128,6 +130,47 @@ export default function PostPage({ params }: Props) {
           <span>{post.readingTime}</span>
         </div>
       </header>
+
+      {seriesNav && (
+        <nav
+          aria-label="Series"
+          className="mb-10 rounded-xl border border-accent-200/80 dark:border-accent-800/50 bg-accent-50/80 dark:bg-accent-950/30 px-4 py-3 sm:px-5"
+        >
+          <p className="text-sm font-medium text-accent-800 dark:text-accent-200 mb-2">
+            {seriesNav.seriesTitle}
+            <span className="font-normal text-accent-600/90 dark:text-accent-400/90">
+              {' '}
+              · Part {seriesNav.partIndex} of {seriesNav.partCount}
+            </span>
+          </p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
+            <div>
+              {seriesNav.prev ? (
+                <Link
+                  href={`/blog/${seriesNav.prev.slug}`}
+                  className="text-accent-700 dark:text-accent-300 hover:underline font-medium"
+                >
+                  ← {seriesNav.prev.title}
+                </Link>
+              ) : (
+                <span className="text-gray-400 dark:text-gray-500">← First in series</span>
+              )}
+            </div>
+            <div className="sm:text-right">
+              {seriesNav.next ? (
+                <Link
+                  href={`/blog/${seriesNav.next.slug}`}
+                  className="text-accent-700 dark:text-accent-300 hover:underline font-medium"
+                >
+                  {seriesNav.next.title} →
+                </Link>
+              ) : (
+                <span className="text-gray-400 dark:text-gray-500">Latest in series →</span>
+              )}
+            </div>
+          </div>
+        </nav>
+      )}
 
       {/* Content */}
       <article className="prose prose-gray dark:prose-invert max-w-none
