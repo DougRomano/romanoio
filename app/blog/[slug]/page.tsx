@@ -134,37 +134,38 @@ export default function PostPage({ params }: Props) {
       {seriesNav && (
         <nav
           aria-label="Series"
-          className="mb-10 rounded-xl border-2 border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-800/90 px-4 py-4 sm:px-5 shadow-sm"
+          className="mb-10 rounded-xl border-2 border-gray-200 bg-gray-100 px-4 py-4 sm:px-5 shadow-sm
+            dark:border-gray-500 dark:bg-gray-900 dark:shadow-[0_4px_24px_-4px_rgba(0,0,0,0.55)] dark:ring-1 dark:ring-inset dark:ring-white/10"
         >
-          <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1 leading-snug">
+          <p className="text-sm font-semibold text-gray-900 dark:text-gray-50 mb-1 leading-snug">
             {seriesNav.seriesTitle}
           </p>
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-600 dark:text-gray-300 mb-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-600 dark:text-gray-200 mb-3">
             Part {seriesNav.partIndex} of {seriesNav.partCount}
           </p>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm border-t border-gray-200 dark:border-gray-600 pt-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm border-t border-gray-200 dark:border-gray-500 pt-3">
             <div>
               {seriesNav.prev ? (
                 <Link
                   href={`/blog/${seriesNav.prev.slug}`}
-                  className="text-accent-600 dark:text-accent-400 hover:text-accent-700 dark:hover:text-accent-300 hover:underline font-semibold"
+                  className="text-accent-600 dark:text-accent-300 hover:text-accent-700 dark:hover:text-accent-200 hover:underline font-semibold"
                 >
                   ← {seriesNav.prev.title}
                 </Link>
               ) : (
-                <span className="text-gray-500 dark:text-gray-400 font-medium">← First in series</span>
+                <span className="text-gray-500 dark:text-gray-300 font-medium">← First in series</span>
               )}
             </div>
             <div className="sm:text-right">
               {seriesNav.next ? (
                 <Link
                   href={`/blog/${seriesNav.next.slug}`}
-                  className="text-accent-600 dark:text-accent-400 hover:text-accent-700 dark:hover:text-accent-300 hover:underline font-semibold"
+                  className="text-accent-600 dark:text-accent-300 hover:text-accent-700 dark:hover:text-accent-200 hover:underline font-semibold"
                 >
                   {seriesNav.next.title} →
                 </Link>
               ) : (
-                <span className="text-gray-500 dark:text-gray-400 font-medium">Latest in series →</span>
+                <span className="text-gray-500 dark:text-gray-300 font-medium">Latest in series →</span>
               )}
             </div>
           </div>
