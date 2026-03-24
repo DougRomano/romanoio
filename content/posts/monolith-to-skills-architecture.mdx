@@ -5,21 +5,16 @@ excerpt: "A 564-line CLAUDE.md became a 23-line router. Eleven memory files beca
 tags: ["Claude Code", "AI", ".NET", "Context Window", "Developer Productivity", "Software Architecture"]
 series: "AI Context Engineering for .NET Teams"
 seriesOrder: 2
+image: "/post-images/monolith-to-skills-architecture-og.svg"
 ---
 
-![Evolution from a 564-line CLAUDE.md monolith to a 23-line router and seven on-demand skills — 82% less always-loaded context](/post-images/monolith-to-skills-architecture.png)
-
-## TL;DR
-
-Over several months of AI-assisted development on a production .NET monorepo, our always-loaded context evolved through three distinct phases and ended up 82% smaller than where it started. A 564-line monolithic `CLAUDE.md` became a 23-line router. Eleven scattered memory files became seven focused on-demand skills. A 344-line constitution became a lean 211-line principles document. The procedural knowledge didn't disappear. It actually grew. It just moved from "always burning tokens" to "loaded only when needed."
-
-Here's the full arc.
+Over several months of AI-assisted development on a production .NET MonoRepo (UI/API project in one solution), our always-loaded context evolved through three distinct phases and ended up 82% smaller than where it started. A 564-line monolithic `CLAUDE.md` became a 23-line router. Eleven scattered memory files became seven focused on-demand skills. A 344-line constitution became a lean 211-line principles document. The procedural knowledge didn't disappear. It actually grew. It just moved from "always burning tokens" to "loaded only when needed."
 
 ---
 
 ## Phase One: The Monolith
 
-When we first adopted Claude Code for BargeOps (a .NET monorepo with an ASP.NET Core Web API using Dapper and SQL Server, plus an MVC/Razor Pages UI), we did what most teams do: we put everything into `CLAUDE.md`.
+When we first adopted Claude Code for WinForms rewrite (a .NET monorepo with an ASP.NET Core Web API using Dapper and SQL Server, plus an MVC/Razor Pages UI), we did what most teams do: we put everything into `CLAUDE.md`.
 
 Every pattern. Every convention. Every edge case we'd been bitten by. The file grew to **564 lines** covering architecture, repository patterns, ListQuery pagination, delete and soft-delete behavior, audit fields, UI standards, DataTables configuration, authorization, transactions, exception types, DTO flow, XSS prevention, and more.
 
