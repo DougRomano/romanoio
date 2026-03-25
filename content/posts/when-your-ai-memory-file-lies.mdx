@@ -8,15 +8,13 @@ seriesOrder: 3
 image: "/post-images/when-your-ai-memory-file-lies-og.png"
 ---
 
-Here's something that isn't in the Claude Code documentation: your `CLAUDE.md` can lie to you.
+Here's something that isn't in the Claude Code documentation: your `CLAUDE.md` can be wrong. Not obviously wrong. Compile-and-pass-tests wrong.
 
-Not maliciously. Not obviously. It lies the way all stale documentation lies, through omission, through drift, through the quiet accumulation of rules that made sense six months ago and have quietly become wrong.
+A stale wiki page sits there waiting for someone to stumble on it. A stale `CLAUDE.md` actively shapes every output Claude generates — every conversation, every scaffold, every PR. The bad pattern doesn't sit idle. It ships.
 
-The difference between a stale wiki page and a stale `CLAUDE.md` is that the wiki page just sits there. Your memory file actively shapes every output Claude generates. Every conversation. Every scaffold. Every pull request.
+When we audited our memory files during [the context refactoring described in Part 2](/posts/monolith-to-skills-architecture), we found what we weren't looking for: contradictions. Patterns that described how we *used* to build things, not how we build them now. Rules that conflicted with each other.
 
-When we audited our memory files during [the context refactoring described in Part 2](/posts/monolith-to-skills-architecture), we found something we hadn't been looking for: contradictions. Rules that conflicted with each other. Patterns that described *how we used to do things* rather than how we do them now.
-
-The code those rules generated compiled cleanly. The tests passed. Nothing in CI flagged it. The bugs went to production because they were architecturally correct, just architecturally *outdated*.
+The code those rules generated compiled cleanly. Tests passed. CI was quiet. The bugs went to production because the patterns were architecturally correct — just architecturally outdated. Nobody flags that in code review.
 
 Here are the five we found.
 
@@ -176,15 +174,15 @@ How it drifted: The button order standard was established and documented in the 
 
 ---
 
-## The Taxonomy of How Drift Happens
+## How the Patterns Rotted
 
-Looking at these five, the drift follows three distinct patterns:
+Five patterns, three ways they went bad.
 
-Architecture evolution drift (Patterns 1, 4): A new pattern replaces an old one. The old pattern remains in the memory file because nobody thought to clean it up. The new pattern is in a different file, a PR description, or verbal team knowledge, never written back to the memory file.
+**A new pattern replaced an old one and nobody updated the file (Patterns 1, 4).** The soft-delete tuple replaced the `bool`. The `createDataTable()` helper replaced raw initialization. Both updates lived in PRs and verbal team knowledge. The memory file kept generating the old way for months because nothing forced the update.
 
-Example selection bias (Patterns 2, 3): The memory file was written from real code examples, but from early code, before standards were fully established. Early code is by definition the most likely to be outdated.
+**The file was written from early code (Patterns 2, 3).** The first screens we built were the most convenient examples to copy — and the most likely to predate the standards we eventually settled on. `ViewBag` was everywhere in the first two screens. The native `time` input appeared before we had a custom picker. The memory file learned from the worst possible source: us before we knew what we were doing.
 
-Partial update drift (Pattern 5): The memory file was updated to reference the standard but kept an old code sample as illustration. The text and the example disagreed, and the example won, because Claude generates code, not prose.
+**The file was partially updated (Pattern 5).** Someone updated the prose to reference the button order standard. Nobody updated the code sample. When text and example disagree, the example wins — because Claude generates code, not documentation.
 
 ---
 
@@ -205,34 +203,31 @@ This is the specific failure mode that makes AI-assisted development riskier tha
 
 ## What We Changed
 
-The fix isn't primarily technical, it's governance. Three changes made the difference:
+The fix is governance, not tooling. Three things actually made a difference.
 
-1. Separate the living constitution from the archaeological record. Our `CLAUDE.md` monolith was both. Splitting into constitution (principles, current) and skills (procedures, versioned) made it structurally obvious when something was the authoritative current state versus historical context.
+**We split the monolith.** Our `CLAUDE.md` was doing two jobs: authoritative current standards and historical context. That's a bad combination because everything looks equally current. We split into a constitution (principles, what's true now) and versioned skills (procedures). When something is in the constitution, it's supposed to be right. When it's stale, that's now visible.
 
-2. Code samples are the source of truth, not the prose. When we rewrote the skills files, the rule was: if you can't write a current, correct code sample for a pattern, the pattern isn't ready to go in the file. This forced us to validate each pattern against the actual codebase before documenting it.
+**We made code samples the gate.** The rule we set when rewriting the skills files: if you can't produce a current, correct, working code sample for a pattern, the pattern doesn't go in the file. This sounds obvious but it's not how documentation gets written. It forced us to validate every pattern against the actual codebase before committing it.
 
-3. Add a ratification date to every pattern. Every section in our `api-patterns` skill now carries a comment:
+**We datestamped every pattern.** Every section in our `api-patterns` skill carries a comment:
 
 ```markdown
-<!-- Last validated: 2026-02-15 against BargeOps.API main branch -->
+<!-- Last validated: 2026-02-15 against Ops.API main branch -->
 ```
 
 If a section's validation date is more than three months old, it's flagged for review in the next sprint. Patterns rot. Knowing *when* they were last checked is the minimum viable version control for AI memory.
 
 ---
 
-## The Contradiction Audit
+## Running the Audit
 
-If you want to do this yourself, the audit is straightforward. Take your `CLAUDE.md` and compare each code sample against the most recent version of that pattern in your actual codebase. Any discrepancy is a candidate for drift.
+The process is mechanical. Take your `CLAUDE.md`, find every code sample, and compare it against the most recent version of that pattern in your actual codebase. Every discrepancy is a drift candidate.
 
-For our five patterns, the audit took about two hours and produced five PRs, one per pattern, that each updated both the skill file and any instances of the outdated pattern found in the codebase.
+For our five patterns, this took about two hours and produced five PRs — one per pattern — each updating the skill file and sweeping the codebase for instances of the outdated pattern.
 
-Two hours. Five patterns. Months of compiling-but-wrong code generation corrected.
+Two hours of audit. Months of confidently-wrong code generation corrected.
 
-The memory file is only as good as its last honest review.
+If you've been using a `CLAUDE.md` for more than a few months without reviewing it against what you're actually shipping, it's already lying to you somewhere. The only question is which patterns.
 
-Next in this series: Now that the context is clean and the patterns are accurate, the final question is governance. How do you keep it that way as the team grows? [Read Part 4 →]
+Next in this series: Context is clean, patterns are accurate — now how do you keep it that way as the team grows? [Read Part 4 →]
 
----
-
-*Doug is a .NET architect at CSG Solutions leading the BargeOps modernization project, converting 195k+ lines of legacy VB.NET WinForms to ASP.NET Core Razor Pages using Claude Code's agent system. He writes about AI-assisted development, context management, and enterprise modernization patterns.*
