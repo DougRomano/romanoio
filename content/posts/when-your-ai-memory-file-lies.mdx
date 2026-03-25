@@ -1,0 +1,238 @@
+---
+title: "When Your AI Memory File Lies: 5 Outdated Patterns We Were Shipping to Production"
+date: "2026-03-25"
+excerpt: "Claude was confidently generating deprecated code. We trusted the memory file. Here's what we found and why these bugs are invisible to code review."
+tags: ["Claude Code", "AI", ".NET", "Code Quality", "Technical Debt", "Developer Productivity"]
+series: "AI Context Engineering for .NET Teams"
+seriesOrder: 3
+image: "/post-images/when-your-ai-memory-file-lies-og.png"
+---
+
+Here's something that isn't in the Claude Code documentation: your `CLAUDE.md` can lie to you.
+
+Not maliciously. Not obviously. It lies the way all stale documentation lies, through omission, through drift, through the quiet accumulation of rules that made sense six months ago and have quietly become wrong.
+
+The difference between a stale wiki page and a stale `CLAUDE.md` is that the wiki page just sits there. Your memory file actively shapes every output Claude generates. Every conversation. Every scaffold. Every pull request.
+
+When we audited our memory files during [the context refactoring described in Part 2](/posts/monolith-to-skills-architecture), we found something we hadn't been looking for: contradictions. Rules that conflicted with each other. Patterns that described *how we used to do things* rather than how we do them now.
+
+The code those rules generated compiled cleanly. The tests passed. Nothing in CI flagged it. The bugs went to production because they were architecturally correct, just architecturally *outdated*.
+
+Here are the five we found.
+
+---
+
+## Pattern 1: The Lie About Delete Return Types
+
+What the memory file said:
+```csharp
+// Delete operations return bool
+public async Task<bool> DeleteBargeAsync(int id)
+{
+    var rowsAffected = await _db.ExecuteAsync(
+        "DELETE FROM Barges WHERE Id = @id", new { id });
+    return rowsAffected > 0;
+}
+```
+
+What we actually ship:
+```csharp
+// Delete operations return a result tuple (success, softDeleted)
+public async Task<(bool success, bool softDeleted)> DeleteBargeAsync(int id)
+{
+    // First attempt soft delete if entity supports it
+    var softDeleteRows = await _db.ExecuteAsync(
+        "UPDATE Barges SET IsDeleted = 1, DeletedAt = GETUTCDATE() WHERE Id = @id AND IsDeleted = 0",
+        new { id });
+
+    if (softDeleteRows > 0) return (true, true);
+
+    // Fall through to hard delete if already soft-deleted or not eligible
+    var hardDeleteRows = await _db.ExecuteAsync(
+        "DELETE FROM Barges WHERE Id = @id", new { id });
+    return (hardDeleteRows > 0, false);
+}
+```
+
+Why this is a real bug: The `bool` signature makes the caller blind to whether soft or hard delete occurred. Audit logging, undo operations, and UI messaging (the "item was archived" vs. "item was permanently deleted" toast) all depend on knowing which path ran. With `bool`, callers assume hard delete. With the tuple, they can branch correctly.
+
+The bug compiles. The bool return value is truthy when the operation succeeds. Tests pass. And somewhere in your activity log, every delete is recorded as a permanent deletion, even the soft ones.
+
+How it drifted: The tuple signature was introduced when we added soft-delete to the first entity. The memory file was never updated. Claude kept generating the `bool` pattern for every new entity for the next three months.
+
+---
+
+## Pattern 2: The Lie About Time Input Types
+
+What the memory file said:
+```html
+<!-- Use HTML5 time inputs for time fields -->
+<input type="time" asp-for="DepartureTime" class="form-control" />
+```
+
+What we actually ship:
+```html
+<!-- Use text inputs with the time CSS class for our custom time picker -->
+<input type="text" asp-for="DepartureTime" class="form-control time" />
+```
+
+Why this is a real bug: The native `type="time"` renders completely differently across browsers and doesn't integrate with our custom time picker component. Our time picker expects `type="text"` with the `time` CSS class as its initialization selector. A `type="time"` input gets ignored by the picker initialization and falls back to the browser's native time UI, which means inconsistent appearance, no AM/PM normalization, and no integration with our validation logic.
+
+This one is invisible in development because Chrome's `type="time"` renders acceptably. It surfaces in QA when someone tests in Firefox or Edge, or when a user complains that the time validation on the Create form behaves differently than on the Edit form (which had the correct pattern).
+
+How it drifted: The custom time picker was added to standardize time input behavior across browsers. It predated the memory file. The memory file was written from a quick scan of an early form that happened to be one of the few forms still using the native time input.
+
+---
+
+## Pattern 3: The Lie About View Data
+
+What the memory file said:
+```csharp
+// Pass data to views using ViewBag for simple values
+public IActionResult Create()
+{
+    ViewBag.StatusOptions = await _lookupService.GetStatusOptionsAsync();
+    ViewBag.BargeTypes = await _lookupService.GetBargeTypesAsync();
+    return View();
+}
+```
+
+What we actually ship:
+```csharp
+// ViewBag is banned. All data flows through typed ViewModels.
+public async Task<IActionResult> Create()
+{
+    var model = new BargeCreateViewModel
+    {
+        StatusOptions = await _lookupService.GetStatusOptionsAsync(),
+        BargeTypes = await _lookupService.GetBargeTypesAsync()
+    };
+    return View(model);
+}
+```
+
+Why this is a real bug: `ViewBag` is dynamic. There's no compile-time checking of property names or types. A typo in the view (`ViewBag.BargeType` instead of `ViewBag.BargeTypes`) throws a null reference at runtime. With a typed ViewModel, the same typo is a build error. In a team environment where junior developers reference existing code to understand patterns, `ViewBag` examples in `CLAUDE.md` teach exactly the wrong pattern, and the AI confidently reinforces it.
+
+How it drifted: `ViewBag` was used in the very first two screens we built, before we established the ViewModel standard. Those early screens were the examples Claude referenced when writing the memory file.
+
+---
+
+## Pattern 4: The Lie About DataTable Initialization
+
+What the memory file said:
+```javascript
+// Initialize DataTables on grid elements
+$('#bargeGrid').DataTable({
+    ajax: { url: '/api/barges', type: 'GET' },
+    columns: [
+        { data: 'Id', title: 'ID' },
+        { data: 'Name', title: 'Name' }
+    ]
+});
+```
+
+What we actually ship:
+```javascript
+// Use the shared createDataTable() helper -- never call .DataTable() directly
+createDataTable('#bargeGrid', '/api/barges', [
+    { data: 'id', title: 'ID' },
+    { data: 'name', title: 'Name' }
+]);
+```
+
+Why this is a real bug: The shared `createDataTable()` helper wraps the DataTables initialization with our standard configuration: consistent error handling, the correct AJAX headers, the `camelCase` column name convention (our API returns camelCase JSON), responsive layout defaults, and the standard empty-state message. Raw `.DataTable()` calls miss all of this.
+
+The consequence is a grid that looks correct at first glance but behaves differently from every other grid in the application. Different error messages when the API is unreachable, different column sort behavior, broken search on mobile, and CORS header mismatches in production.
+
+How it drifted: The `createDataTable()` helper was built to standardize behavior after the first four screens were built using raw `.DataTable()`. The memory file was written from those first four screens.
+
+---
+
+## Pattern 5: The Lie About Button Order
+
+What the memory file said:
+```html
+<!-- Search form action buttons -->
+<button type="submit" class="btn btn-primary">Search</button>
+<button type="button" class="btn btn-secondary" id="clearBtn">Clear</button>
+<button type="button" class="btn btn-success" asp-action="Create">Add Barge</button>
+```
+
+What we actually ship:
+```html
+<!-- Correct order: Search > Clear > Add [Entity]; always left-to-right, one row, top-left -->
+<div class="d-flex gap-2 mb-3">
+    <button type="submit" class="btn btn-primary">Search</button>
+    <button type="button" class="btn btn-outline-secondary" id="clearBtn">Clear</button>
+    <a asp-action="Create" class="btn btn-success">Add Barge</a>
+</div>
+```
+
+Why this is a real bug: It sounds cosmetic. It isn't. The button order is a UX standard that every screen in the application follows. When one screen puts "Add Barge" after "Clear" and another puts it after "Search," users notice, especially power users who tab between screens repeatedly. More concretely: our style guide specifies that the Add button uses `<a>` with `asp-action`, not `<button>`, because it's navigation rather than a form action. The wrong element generates an HTTP POST instead of a GET when clicked with JavaScript disabled, breaking the Create flow in certain environments.
+
+The gap between the two versions is also structural. The `d-flex gap-2` wrapper is required for the button row to align correctly with the search form's grid layout. Without it, the buttons collapse differently on tablet widths.
+
+How it drifted: The button order standard was established and documented in the UI standards document. The memory file was updated to reference it but kept the old code sample as an "example," and the example was wrong.
+
+---
+
+## The Taxonomy of How Drift Happens
+
+Looking at these five, the drift follows three distinct patterns:
+
+Architecture evolution drift (Patterns 1, 4): A new pattern replaces an old one. The old pattern remains in the memory file because nobody thought to clean it up. The new pattern is in a different file, a PR description, or verbal team knowledge, never written back to the memory file.
+
+Example selection bias (Patterns 2, 3): The memory file was written from real code examples, but from early code, before standards were fully established. Early code is by definition the most likely to be outdated.
+
+Partial update drift (Pattern 5): The memory file was updated to reference the standard but kept an old code sample as illustration. The text and the example disagreed, and the example won, because Claude generates code, not prose.
+
+---
+
+## Why Code Review Doesn't Catch This
+
+Every one of these patterns produces code that:
+
+- Compiles without warnings
+- Passes unit tests (assuming tests were written from the same outdated pattern)
+- Passes linting
+- Looks correct to a reviewer who learned the pattern from the same `CLAUDE.md`
+
+Code review catches deviation from known standards. It can't catch cases where the standard itself is wrong. When the AI and the reviewer share the same outdated source of truth, the bug has air cover from both sides.
+
+This is the specific failure mode that makes AI-assisted development riskier than it appears. The AI doesn't just generate code, it generates *confident* code that looks like it was written by someone who knows the codebase. The velocity is real. The overconfidence is also real.
+
+---
+
+## What We Changed
+
+The fix isn't primarily technical, it's governance. Three changes made the difference:
+
+1. Separate the living constitution from the archaeological record. Our `CLAUDE.md` monolith was both. Splitting into constitution (principles, current) and skills (procedures, versioned) made it structurally obvious when something was the authoritative current state versus historical context.
+
+2. Code samples are the source of truth, not the prose. When we rewrote the skills files, the rule was: if you can't write a current, correct code sample for a pattern, the pattern isn't ready to go in the file. This forced us to validate each pattern against the actual codebase before documenting it.
+
+3. Add a ratification date to every pattern. Every section in our `api-patterns` skill now carries a comment:
+
+```markdown
+<!-- Last validated: 2026-02-15 against BargeOps.API main branch -->
+```
+
+If a section's validation date is more than three months old, it's flagged for review in the next sprint. Patterns rot. Knowing *when* they were last checked is the minimum viable version control for AI memory.
+
+---
+
+## The Contradiction Audit
+
+If you want to do this yourself, the audit is straightforward. Take your `CLAUDE.md` and compare each code sample against the most recent version of that pattern in your actual codebase. Any discrepancy is a candidate for drift.
+
+For our five patterns, the audit took about two hours and produced five PRs, one per pattern, that each updated both the skill file and any instances of the outdated pattern found in the codebase.
+
+Two hours. Five patterns. Months of compiling-but-wrong code generation corrected.
+
+The memory file is only as good as its last honest review.
+
+Next in this series: Now that the context is clean and the patterns are accurate, the final question is governance. How do you keep it that way as the team grows? [Read Part 4 →]
+
+---
+
+*Doug is a .NET architect at CSG Solutions leading the BargeOps modernization project, converting 195k+ lines of legacy VB.NET WinForms to ASP.NET Core Razor Pages using Claude Code's agent system. He writes about AI-assisted development, context management, and enterprise modernization patterns.*
