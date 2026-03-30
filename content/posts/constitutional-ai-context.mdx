@@ -30,13 +30,14 @@ The fix isn't better tooling. It's explicit governance structure, the same struc
 
 ## The Constitutional Hierarchy
 
-The model we use has four tiers, each with defined authority and scope:
+The model we use has five tiers, each with defined authority and scope:
 
 ```
 Tier 1: CLAUDE.md (router)          -- navigation only, ~20 lines
 Tier 2: constitution.md (law)       -- immutable principles, versioned
-Tier 3: /skills (implementation)    -- procedures, evolving independently
-Tier 4: .cursor/rules/*.mdc (hints) -- glob-scoped reminders, thin
+Tier 3: /agents (orchestrators)     -- role-scoped, always loaded, thin
+Tier 4: /skills (implementation)    -- procedures, on-demand
+Tier 5: .cursor/rules/*.mdc (hints) -- glob-scoped reminders, thin
 ```
 
 Each tier has a defined role and a defined relationship to the tiers above it.
@@ -52,17 +53,18 @@ Each tier has a defined role and a defined relationship to the tiers above it.
 
 ## Governance
 All rules are governed by constitution.md (v1.10.0).
-Skills beat cursor rules. Constitution beats skills. This file beats nothing.
+Constitution beats agents. Agents load skills. Skills beat cursor rules. This file beats nothing.
 
 ## Key References
 - Architecture & principles: constitution.md
+- Agents:                    /api-architect, /ui-architect
 - API patterns:              /api-patterns skill
-- UI conventions:           /ui-conversion skill
-- DataTables:               /datatables skill
-- Playwright tests:         /playwright skill
-- Build & run:              /build skill
-- File locations:           /repo-docs skill
-- Git workflow:             /git-workflow skill
+- UI conventions:            /ui-conversion skill
+- DataTables:                /datatables skill
+- Playwright tests:          /playwright skill
+- Build & run:               /build skill
+- File locations:            /repo-docs skill
+- Git workflow:              /git-workflow skill
 ```
 
 Nothing in `CLAUDE.md` can be used as a rule. If Claude quotes `CLAUDE.md` as justification for a pattern choice, that's a bug. The justification should come from the constitution or a skill. The router just tells you where to look.
@@ -101,9 +103,38 @@ Audit logging must record the delete type.
 
 Every section that has an implementation counterpart in a skill ends with that pointer. The constitution describes *what*, the skill describes *how*.
 
-### Tier 3: Skills (Versioned Implementations)
+### Tier 3: Agents (Role-Scoped Orchestrators)
 
-Skills are where the code lives. They're written by the developer doing the work, reviewed against the constitution, and versioned independently.
+Agents are the orchestration layer. They run parallel work sessions against different parts of the codebase, each scoped to a role: API layer, UI layer, testing, git workflow. An `api-architect` agent knows the API stack. A `ui-architect` agent knows the Razor Pages conventions. They can run simultaneously without colliding because their constitutional scope is declared and non-overlapping.
+
+The critical distinction from skills: agents are **always loaded**, not on-demand. They appear as a dedicated line in `/context` output and burn tokens in every session whether you invoke them explicitly or not. That changes the design constraint. An agent that contains code samples and step-by-step procedures is doing the skill's job, wasting always-on budget for content that should be on-demand.
+
+The right agent is thin. It declares its constitutional scope, names the skills it delegates to, and says nothing else procedural:
+
+```markdown
+# API Architect Agent
+**Role:** API layer design and implementation
+**Implements:** constitution.md v1.10.0
+**Delegates to:** /api-patterns (always), /datatables (grid work)
+
+## Scope
+Repository layer, service layer, controller patterns, delete operations,
+audit fields, and authorization enforcement.
+
+Load /api-patterns before any API scaffolding task.
+Load /datatables when the task involves data grids.
+All patterns are governed by constitution.md § 3.x and § 4.x.
+```
+
+No procedures. No code samples. Scope, constitutional alignment, and skill routing. That's all an agent needs.
+
+Where agents add governance value is in multi-session parallel work. When you're running five or six terminal sessions simultaneously (one for the API layer, one for UI conversion, one writing xUnit tests against what the others are producing), each agent carries the same constitution version reference. They can work in parallel because they each know exactly which constitutional sections govern their domain and where their scope ends. The constitution is the shared reference that keeps independent agents from generating contradictory patterns.
+
+The amendment rules that apply to skills apply to agents as well. When the constitution version changes, any agent that references an old version is flagged. When an agent's declared scope overlaps with another agent's scope, that's a conflict to resolve in the amendment process, not something to leave to chance.
+
+### Tier 4: Skills (Versioned Implementations)
+
+Skills are where the code lives. Agents load them. They're written by the developer doing the work, reviewed against the constitution, and versioned independently.
 
 Each skill carries a constitution version reference at the top:
 
@@ -125,7 +156,7 @@ The `Implements: constitution.md v1.10.0` line is load-bearing. When the constit
 
 Skills can evolve independently and frequently. Add new code samples, new patterns for new entities, new sections as the codebase grows without ever touching the constitution. The only constraint is they can't violate a constitutional principle. Everything the constitution permits is fair game.
 
-### Tier 4: Cursor Rules (Thin Hints)
+### Tier 5: Cursor Rules (Thin Hints)
 
 Cursor rules are the lowest-authority tier. They exist for one reason: to remind Claude of the most common principles when working in a specific part of the codebase without loading a skill.
 
@@ -156,10 +187,10 @@ The most important part of this isn't the tier system. It's that every file know
 Every file in the system begins with a block like this:
 
 ```markdown
-**Authority tier:** [Router | Constitution | Skill | Hint]
+**Authority tier:** [Router | Constitution | Agent | Skill | Hint]
 **Superseded by:** [higher-tier document name]
 **Supersedes:** [lower-tier document names, if any]
-**Version:** [for constitution and skills]
+**Version:** [for constitution, agents, and skills]
 ```
 
 When Claude reads any file in the system, it immediately knows the file's authority level and what to do when it conflicts with something else already in context. There's no ambiguity. The conflict resolution rule is written into the file that will be the loser.
@@ -214,7 +245,7 @@ You don't need to implement all of this at once. The minimum viable constitution
 
 **2. Add a precedence declaration to every rule file you have.** One line at the top of each file: "This document's authority is [level]. It is superseded by [higher document]." This alone will surface conflicts you didn't know you had.
 
-Everything else can be added incrementally: the tier system, the amendment process, the skill-to-constitution version references. Add them as the need becomes obvious.
+Everything else can be added incrementally: the full tier system, the amendment process, agent scope declarations, the skill-to-constitution version references. Add them as the need becomes obvious.
 
 The goal isn't a perfect governance system on day one. The goal is a system that stays coherent as it grows. The constitutional model is how you get there.
 
