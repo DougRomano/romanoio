@@ -1,0 +1,227 @@
+---
+title: "Constitutional AI Context: How to Structure Rules That Don't Drift"
+date: "2026-03-26"
+excerpt: "CLAUDE.md has a governance problem. Without structure, every developer adds rules, nobody removes them, and the AI gets three conflicting answers to the same question. Here's the governance model that fixed it."
+tags: ["Claude Code", "AI", ".NET", "Software Architecture", "Team Collaboration", "Developer Productivity"]
+series: "AI Context Engineering for .NET Teams"
+seriesOrder: 4
+image: "/post-images/constitutional-ai-context-og.png"
+---
+
+The previous posts in this series are about what happens when AI context goes wrong at the file level: bloat, outdated patterns, skill misfires. This one is about what happens when it goes wrong at the *team* level.
+
+You can have a perfectly structured `CLAUDE.md` that works great for one developer and becomes a governance disaster the moment a second developer starts editing it. The rules that were consistent under one author drift the instant anyone else has write access. Six months in, you have three different answers to "how do we handle soft deletes?" living in three different files, and Claude picks one at random.
+
+That's the constitutional crisis problem. Here's the governance model that solved it.
+
+---
+
+## The Problem With Consensus-Driven Context
+
+Most teams treat their `CLAUDE.md` the way they treat a wiki: everybody can edit it, edits are additive, and nothing gets removed because nobody has the authority to decide what's obsolete.
+
+The result is a rules file that grows by accretion. Each rule added in response to a problem never gets weighed against the rules already there. Eventually you have rules that contradict, rules that duplicate, and rules that describe workflows that no longer exist.
+
+The failure mode for AI context is worse than for wikis because the AI doesn't resolve conflicts by asking for clarification. It picks. Sometimes it picks the most recent rule, sometimes the one with more specificity, sometimes the one that appears first in the file. The developer never knows which rule won. The inconsistency is invisible until a bug surfaces.
+
+The fix isn't better tooling. It's explicit governance structure, the same structure that keeps any law-like system coherent over time.
+
+---
+
+## The Constitutional Hierarchy
+
+The model we use has four tiers, each with defined authority and scope:
+
+```
+Tier 1: CLAUDE.md (router)          -- navigation only, ~20 lines
+Tier 2: constitution.md (law)       -- immutable principles, versioned
+Tier 3: /skills (implementation)    -- procedures, evolving independently
+Tier 4: .cursor/rules/*.mdc (hints) -- glob-scoped reminders, thin
+```
+
+Each tier has a defined role and a defined relationship to the tiers above it.
+
+### Tier 1: The Router
+
+`CLAUDE.md` is not a governance document. It's a navigation document. It contains exactly two things: the current project context (what we're building, what stack we're on) and pointers to where the real rules live.
+
+```markdown
+# BargeOps -- AI Context Router
+**Stack:** ASP.NET Core Razor Pages + Web API | Dapper | SQL Server | Claude Code Opus 4.6
+**Phase:** VB.NET WinForms to ASP.NET Core Razor Pages migration (195k+ lines)
+
+## Governance
+All rules are governed by constitution.md (v1.10.0).
+Skills beat cursor rules. Constitution beats skills. This file beats nothing.
+
+## Key References
+- Architecture & principles: constitution.md
+- API patterns:              /api-patterns skill
+- UI conventions:           /ui-conversion skill
+- DataTables:               /datatables skill
+- Playwright tests:         /playwright skill
+- Build & run:              /build skill
+- File locations:           /repo-docs skill
+- Git workflow:             /git-workflow skill
+```
+
+Nothing in `CLAUDE.md` can be used as a rule. If Claude quotes `CLAUDE.md` as justification for a pattern choice, that's a bug. The justification should come from the constitution or a skill. The router just tells you where to look.
+
+### Tier 2: The Constitution
+
+`constitution.md` is where the principles live. It's versioned with semantic versioning (`1.10.0`), it carries a ratification date, and it's the single source of truth for every architectural decision.
+
+The version number isn't decoration. It means something:
+
+- **Patch** (1.10.0 to 1.10.1): clarification of an existing rule, no behavioral change
+- **Minor** (1.10.0 to 1.11.0): new rule added, backward-compatible with existing skills
+- **Major** (1.10.0 to 2.0.0): rule changed in a way that makes existing skill implementations non-compliant; skills must be audited
+
+```markdown
+# BargeOps Engineering Constitution
+**Version:** 1.10.0
+**Ratified:** 2026-02-15
+**Authority:** Architecture review, Doug Romano
+
+## Hierarchy and Conflict Resolution
+
+This constitution is the highest-authority document in the AI context system.
+Skills implement constitutional principles. Cursor rules remind; they do not govern.
+When any lower-tier document conflicts with this constitution, this constitution wins.
+Open a task to align the lower-tier document.
+
+## Delete Operations (§3.2)
+
+All delete operations return `(bool success, bool softDeleted)`.
+Entities with IsDeleted support soft delete on first call and hard delete on second.
+Audit logging must record the delete type.
+
+> Procedural implementation: /api-patterns skill, §Delete Patterns
+```
+
+Every section that has an implementation counterpart in a skill ends with that pointer. The constitution describes *what*, the skill describes *how*.
+
+### Tier 3: Skills (Versioned Implementations)
+
+Skills are where the code lives. They're written by the developer doing the work, reviewed against the constitution, and versioned independently.
+
+Each skill carries a constitution version reference at the top:
+
+```markdown
+# API Patterns Skill
+**Implements:** constitution.md v1.10.0
+**Last validated:** 2026-02-15 against BargeOps.API main branch
+**Loaded by:** /api-patterns
+
+## Constitutional alignment
+This skill implements § 3.1 (Repository Layer), § 3.2 (Delete Operations),
+§ 3.4 (Audit Fields), § 3.5 (Authorization), § 4.1 (ListQuery Pattern).
+
+If a pattern here conflicts with the constitution, follow the constitution
+and open a task to update this skill.
+```
+
+The `Implements: constitution.md v1.10.0` line is load-bearing. When the constitution version changes, any skill that references an old version is immediately flagged as potentially non-compliant without even opening the file.
+
+Skills can evolve independently and frequently. Add new code samples, new patterns for new entities, new sections as the codebase grows without ever touching the constitution. The only constraint is they can't violate a constitutional principle. Everything the constitution permits is fair game.
+
+### Tier 4: Cursor Rules (Thin Hints)
+
+Cursor rules are the lowest-authority tier. They exist for one reason: to remind Claude of the most common principles when working in a specific part of the codebase without loading a skill.
+
+The rule for cursor rules is simple: **remind, never govern.** A cursor rule that contains a code sample is doing the skill's job and should be replaced by a skill pointer. A cursor rule that resolves a conflict is overstepping and belongs in the constitution.
+
+```markdown
+---
+globs: "**/BargeOps.UI/Views/**/*"
+---
+
+# UI Standards hint
+
+Authority: constitution.md § 5.x. Full detail: /ui-conversion skill.
+
+- Buttons: Search > Clear > Add [Entity]; one row, left-aligned
+- ViewModels only, no ViewBag, no ViewData
+- Time inputs: type="text" class="time" (custom picker, not type="time")
+```
+
+Three bullets. No code samples. Just enough to catch the most common mistakes without a skill load.
+
+---
+
+## The Precedence Declaration Pattern
+
+The most important part of this isn't the tier system. It's that every file knows its place and says so. That's the precedence declaration pattern, and it turns an implicit hierarchy into one that documents itself.
+
+Every file in the system begins with a block like this:
+
+```markdown
+**Authority tier:** [Router | Constitution | Skill | Hint]
+**Superseded by:** [higher-tier document name]
+**Supersedes:** [lower-tier document names, if any]
+**Version:** [for constitution and skills]
+```
+
+When Claude reads any file in the system, it immediately knows the file's authority level and what to do when it conflicts with something else already in context. There's no ambiguity. The conflict resolution rule is written into the file that will be the loser.
+
+This is the single change that eliminates the "which version of the ListQuery pattern is canonical?" problem. The answer is always whichever version is in the highest-authority document that addresses it. And every document tells you what's higher.
+
+---
+
+## The Amendment Process
+
+A constitution without an amendment process is just a suggestion. Ours is lightweight but explicit.
+
+**For patch amendments** (clarification only): One developer edits the constitution, increments the patch version, adds a note to the changelog, and opens a PR. Another developer reviews to confirm no behavioral change.
+
+**For minor amendments** (new rule): Developer proposes the rule in a task, documents the use case and why the current constitution doesn't cover it, and opens a PR. Architecture review confirms the rule doesn't conflict with existing ones. Skills are checked to confirm nothing needs updating.
+
+**For major amendments** (changed rule): Developer documents the old behavior, the reason for the change, and the impact on existing skills. All skills that implement the changed section are updated in the same PR. All cursor rules that mention the changed pattern are updated. A grace period comment is added to the old pattern in any existing screens that need retrofitting.
+
+The process sounds heavyweight. In practice, patches happen weekly (someone clarifying ambiguous wording), minor amendments happen monthly, and major amendments have happened twice in eight months. The friction is the point. A document that governs AI output across an entire codebase shouldn't be easy to change casually.
+
+---
+
+## Applying This at Scale
+
+The constitutional model was designed for one developer working on one codebase. It scales to teams with one rule: never edit the constitution concurrently, and any merge conflict requires both authors to resolve it together.
+
+That sounds like a bottleneck. It isn't, because the constitution changes slowly and deliberately. Day-to-day work happens in skills, which are independent and can be edited freely. The constitution is the stable foundation, not the active working layer.
+
+For teams larger than about four developers, it's worth adding a lightweight RFC process for minor amendments: a short document explaining the proposed rule and a 24-hour comment period before merge. The overhead is minimal and it prevents silent conflicts from two developers independently adding rules that collide.
+
+---
+
+## What This Governance Model Prevents
+
+After eight months under this structure, here are the specific failures it prevents:
+
+**Silent contradiction** is impossible. Every document has a declared authority level. If two documents say different things, the lower-authority one is wrong by definition, and that's fixable.
+
+**Accretive bloat** is structurally contained. Principles go in the constitution, reviewed on every edit. Procedures go in skills, large but on-demand. Nothing new gets added to the router. Growth gets routed to the right tier.
+
+**Authority ambiguity** is eliminated. New developers joining the project don't need to be told "the constitution overrides the cursor rules" because it's written in every file. They don't need to be told "ask before changing the constitution" because the amendment process is in the constitution itself.
+
+**Stale patterns** are detectable. Skills carry validation dates. The constitution carries a ratification date. When you see a skill that says `Implements: constitution.md v1.7.0` and the current constitution is `v1.10.0`, you know that skill was written against an older version and may need an audit. It doesn't mean it's wrong. It means it's flagged.
+
+---
+
+## The Starting Point
+
+You don't need to implement all of this at once. The minimum viable constitutional governance is two changes from wherever you are today:
+
+**1. Add a version number and ratification date to your `CLAUDE.md`.** Even if the document is still a monolith, versioning it immediately makes changes traceable and gives you a reference point when things drift.
+
+**2. Add a precedence declaration to every rule file you have.** One line at the top of each file: "This document's authority is [level]. It is superseded by [higher document]." This alone will surface conflicts you didn't know you had.
+
+Everything else can be added incrementally: the tier system, the amendment process, the skill-to-constitution version references. Add them as the need becomes obvious.
+
+The goal isn't a perfect governance system on day one. The goal is a system that stays coherent as it grows. The constitutional model is how you get there.
+
+---
+
+*This is the fourth and final post in the AI Context Engineering for .NET Teams series. The series covers context auditing (Part 1), skills architecture (Part 2), pattern drift (Part 3), and governance (Part 4).*
+
+---
+
+*Doug is a .NET architect at CSG Solutions leading the BargeOps modernization project, converting 195k+ lines of legacy VB.NET WinForms to ASP.NET Core Razor Pages using Claude Code's agent system. He writes about AI-assisted development, context management, and enterprise modernization patterns.*
