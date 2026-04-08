@@ -1,0 +1,84 @@
+---
+title: "Hands-Free Architecture Reviews: How I Use Voice Mode and SpecKit for .NET Design Sessions"
+date: "2026-04-07"
+image: "/post-images/hands-free-architecture-reviews-claude-voice-mode-speckit-og.png"
+excerpt: "Narrate your architecture. Let SpecKit turn it into a spec, a plan, tasks, and working code. No keyboard. No lossy translation."
+tags: ["AI", "Claude Code", ".NET", "Software Architecture", "Developer Productivity", "ASP.NET", "SpecKit"]
+---
+
+I've been narrating architecture decisions for a while — first with VoiceInk dictating into IDE, now with Claude Code's built-in voice mode. The input method changed. The workflow didn't. What actually changed the game was SpecKit: the pipeline that takes what I said at the whiteboard and drives it to working code without touching the keyboard again.
+
+Here's why it matters for .NET developers.
+
+## SpecKit Is the Point
+
+Voice input gets you out of the chair. SpecKit is why that matters.
+
+SpecKit is a sequence of slash commands that takes a narrated description and produces a working implementation. Four commands, in order: `/speckit-specify`, `/speckit-plan`, `/speckit-tasks`, `/speckit-implement`.
+
+**`/speckit-specify`** formalizes the narration into numbered requirements — `REQ-001`, `REQ-002` — with Given/When/Then acceptance criteria, a migration notes section if we're extracting logic from a legacy WinForms layer, and a spec file tied to the Jira ticket. This is not a document I draft afterward. It's the structured version of what I said at the board.
+
+**`/speckit-plan`** maps every requirement to the files that change: controllers, repositories, ViewModels, Razor views, service interfaces. It surfaces dependencies — which changes land first, which are blocked, whether a database migration is in the path. That sequencing used to live in my head or die in a doc nobody read.
+
+**`/speckit-tasks`** breaks the plan into discrete units of work: each tied to a `REQ-###`, each with an explicit "Done When" statement, each ordered by layer — data first, then service, then controller, then view. That matches the natural dependency order of an ASP.NET MVC stack, which matters when Claude is implementing them sequentially.
+
+**`/speckit-implement`** executes them in order. After each logical group, it verifies which requirements are satisfied before moving forward. Every changed file gets a comment block tying it to the task and requirement:
+
+```csharp
+// TASK-001 | REQ-001 — Exclude soft-deleted facilities from dropdown
+```
+
+Narration becomes spec. Spec becomes plan. Plan becomes tasks. Tasks become code. The architectural thinking — the tradeoffs, the edge cases, the sequencing — flows through without being re-typed at every stage.
+
+## Before SpecKit: The Planning Conversation
+
+Voice mode isn't just the input to SpecKit — it's where I flush out the requirements before formalizing them.
+
+When I'm picking up a new feature or a complex ticket, I don't jump straight to `/speckit-specify`. I narrate everything I can think of first. What the feature needs to do. What the edge cases are. What could go wrong. What the migration constraints are if we're ripping logic out of a WinForms form. I talk it out with Claude the same way I'd walk a colleague through it at a whiteboard — but the output isn't a design sketch that gets lost, it's a conversation I can hand directly to SpecKit.
+
+That pre-spec session is where the messy thinking happens. Contradictions surface. Assumptions get challenged. The scope gets tighter. By the time I run `/speckit-specify`, I've already worked through the hard parts and the spec comes out much cleaner than if I'd gone straight to formalizing.
+
+The rhythm is: talk through the whole problem first, iterate on it until the constraints are clear, then lock it down with SpecKit.
+
+## Standups and Reviews Are Where I Use This Most
+
+The place this pays off daily isn't the long architecture session. It's the quick ones.
+
+In standups, I narrate blockers and decisions as they surface instead of writing them up afterward. "The `OrderService` dependency on `IPaymentGateway` is creating a circular reference through `InvoiceRepository`. I'm going to break the cycle by introducing a `PaymentRequestedEvent` and handling fulfillment asynchronously." Thirty seconds. Spoken. `/speckit-specify` turns it into a requirement. The decision is captured before the standup is over — not in a Confluence page nobody reads, but in a spec that drives implementation.
+
+In code reviews, I narrate concerns while reading the diff. Instead of writing a comment, I talk through the issue: what the code is doing, what it should be doing, what the constraint is. If the fix is straightforward, I hand it to SpecKit and have a corrected implementation before the review meeting ends.
+
+QA tickets are where the ROI is most visible. When a project defect ticket comes in, I pull it through the Atlassian MCP, read through every comment, and narrate each reported item: what the defect is, what the correct behavior should be, what the fix involves. A real ticket might look like:
+
+```
+1. [DEFECT]     Facility dropdown shows deleted records — IsActive filter missing
+2. [VALIDATION] River area name allows blank on save — server-side check absent
+3. [UX]         Success toast disappears in under 1s on mobile viewport
+4. [EDGE]       Zero river areas on a new facility causes null ref in the index
+```
+
+That narration becomes the input to `/speckit-specify`. Each item maps to at least one `REQ-###`. The plan ranks them by dependency — data layer fixes first, then service, then controller, then view. Every task gets a "Done When" with a named test: `FacilityRepositoryTests.GetAllForDropdown_ExcludesInactive`. Every changed file gets a comment block: `// TASK-001 | REQ-001 — Exclude soft-deleted facilities from dropdown`.
+
+That full session — Jira pull, narration, spec, plan, tasks, implementation — replaces what used to be an hour of ticket triage and write-up before touching code.
+
+## What a Real Architecture Session Looks Like
+
+On a recent sprint in our WinForms-to-ASP.NET Core MVC migration (275k+ lines of legacy VB.NET coming across), I was reviewing a bloated service layer before writing anything. File open on the monitor, marker in hand:
+
+> "OrderProcessingService is doing too many things. It's handling payment, updating inventory, sending the confirmation email, and writing to the audit log — all in one method, all in one transaction scope. Payment and inventory need to stay in the transaction. Email and audit logging should not be blocking the response. I want to move those to a post-commit step using a domain event pattern. Tell me what the event contract should look like and where I should register the handlers given we're using a minimal API setup with a service registration extension pattern."
+
+Forty seconds. The response came back with a concrete event interface, a wiring suggestion for the service registration extension, and a flag: if the process crashes between commit and event dispatch, there's a gap. That's the feedback you want before moving code.
+
+That's the pre-spec conversation. Then `/speckit-specify`. The narration became `REQ-001` for the transaction boundary, `REQ-002` for the event contract, `REQ-003` for handler registration. Three requirements from one spoken description, ready to drive the full pipeline.
+
+## The Review Becomes the First Step of Delivery
+
+The traditional architecture review is a meeting. Decisions documented afterward, imperfectly, by whoever was taking notes. The gap between "we agreed on the design" and "here's the code" gets filled with write-ups, follow-ups, and re-explaining the same intent to whoever is implementing it.
+
+When voice connects to SpecKit, that gap closes. The review produces the spec. The spec drives the implementation. The discussion is the first step of delivery, not a separate phase before it starts.
+
+I walk into team reviews with weak spots already identified and a SpecKit spec already written — because I narrated the design session the day before and ran it through the pipeline. No documentation pass. No context lost in translation. The spec is what I actually said.
+
+On a project like ours — a 275k+ line VB.NET-to-ASP.NET Core MVC migration running on Dapper and SQL Server — that compresses the time from "ticket in Jira" to "implementation branch created" from hours to under 30 minutes. The voice session doesn't save me from doing the thinking. It saves me from repeating it four times in four different forms.
+
+That's the actual change. Not the voice input. The pipeline it feeds.
