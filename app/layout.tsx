@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -6,8 +6,8 @@ import Analytics from '@/components/Analytics';
 
 export const metadata: Metadata = {
   title: {
-    default: 'Doug Romano — AI-First Developer & .NET Architect',
-    template: '%s | romano.io',
+    default: 'Doug Romano — AI-first .NET developer · romano.io',
+    template: '%s · romano.io',
   },
   description:
     'Writing honestly about AI agents, Claude Code, agentic workflows, and 25+ years of .NET in production. By Doug Romano, St. Louis.',
@@ -34,6 +34,13 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#0f172a' },
+  ],
 };
 
 export default function RootLayout({

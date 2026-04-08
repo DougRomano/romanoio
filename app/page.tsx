@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import PostCard from '@/components/PostCard';
-import { getAllPosts } from '@/lib/posts';
+import { BLOG_POSTS_PER_PAGE, getAllPosts } from '@/lib/posts';
 
 export default function HomePage() {
-  const latestPosts = getAllPosts().slice(0, 10);
+  const latestPosts = getAllPosts().slice(0, BLOG_POSTS_PER_PAGE);
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6">
@@ -13,7 +13,8 @@ export default function HomePage() {
           Hey, I&apos;m Doug
         </p>
         <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 dark:text-white leading-tight mb-6">
-          AI-First Developer.
+          AI-First Developer. <br className="hidden sm:block" />
+          30 Years of .NET Behind It.
         </h1>
         <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl leading-relaxed mb-10">
           I spent three decades building .NET systems the traditional way. Now I build with AI agents,

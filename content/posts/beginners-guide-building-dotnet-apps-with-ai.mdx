@@ -51,7 +51,7 @@ Here's the kind of exchange that makes this step worth it. You tell the AI: "I n
 
 That's the kind of conversation where AI is useful. You're not accepting defaults. You're having an architecture discussion at the speed of chat.
 
-Once you're happy with the schema, bring it into your Building AI. Paste the SQL into your editor and ask Copilot or Claude to generate the corresponding C# entities, your DbContext configuration (if you're using EF Core), or your Dapper mappings. Because you already established the data model in detail, the generated code will be dramatically better than if you'd just asked "generate a data access layer for an equipment tracking app."
+Once you're happy with the schema, bring it into your Building AI. Paste the SQL into your editor and ask Copilot or Claude to generate the corresponding C# entities, your DbContext configuration (if you're using EF Core), or your Dapper mappings. One thing AI won't automatically get right without guidance is indexing — it's worth reading [SQL Index Tuning: The Fundamentals I Keep Coming Back To](/posts/sql-index-tuning-fundamentals) before you let it generate your migration scripts, because the mental model for which indexes matter and why is something you need to bring to the review. Because you already established the data model in detail, the generated code will be dramatically better than if you'd just asked "generate a data access layer for an equipment tracking app."
 
 The quality of the output is directly proportional to the quality of the input. Every time.
 
@@ -97,7 +97,9 @@ AI-generated code compiles. It usually runs. It often looks reasonable. And some
 
 You are still the engineer. The AI is a very fast junior developer who never gets tired but also never pushes back. It will write code that technically satisfies your prompt while missing the point entirely. It will use patterns that are valid C# but wrong for your architecture. It will ignore your established conventions unless you explicitly tell it about them.
 
-Review AI-generated code the same way you'd review a pull request from a new team member. Check the logic against your business rules. Verify the SQL is using the right indexes. Make sure the error handling isn't just swallowing exceptions. Run your tests.
+Review AI-generated code the same way you'd review a pull request from a new team member. Check the logic against your business rules. Verify the SQL is using the right indexes. Make sure the error handling isn't just swallowing exceptions — the [Result pattern](/posts/result-pattern-dotnet) is worth reading if you want a better approach than exception-based control flow for expected failures. Run your tests.
+
+The deeper reason this review step matters: the model was trained on the internet, and most code on the internet is mediocre. [Most of the Code AI Learned From Is Garbage](/posts/most-code-ai-learned-from-is-garbage) is the honest version of that. Your job as the senior developer isn't just reviewing what the AI produced — it's correcting for what it was trained to produce.
 
 The developers getting the most out of AI aren't the ones generating code fastest. They're the ones reviewing it most carefully.
 
@@ -134,6 +136,8 @@ The biggest mistake I see experienced developers make isn't using AI poorly. It'
 Start with one small project. Something low-stakes. A utility app, an internal tool, a prototype. Use the Thinking AI to plan it. Use the Building AI to generate code. Review everything. Commit often. See how it feels.
 
 You'll adapt the workflow to fit how you think. Everyone does. But you have to start to get there.
+
+When you're ready to go deeper, [Nine Months in the Trenches of Agentic Development](/posts/nine-months-in-the-trenches) is where this all leads — what it looks like when you stop treating AI as a coding assistant and start treating it as an orchestration layer. And [I Haven't Typed Code in Months. I've Never Shipped More.](/posts/i-havent-typed-code-in-months) is the honest account of what the end state feels like on a production project.
 
 ---
 

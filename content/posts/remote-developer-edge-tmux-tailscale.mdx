@@ -11,7 +11,7 @@ You've finally done it. You've built an agentic AI system that actually works. I
 
 Or do you?
 
-This is the challenge I ran into building the Claude Winforms Conversion Agent, a suite of 10 specialized TypeScript agents designed to systematically analyze and convert legacy VB.NET Windows Forms applications into modern ASP.NET Core MVC architecture. The orchestrator runs agents sequentially, each one building on the last, processing thousands of lines of legacy code across forms, business objects, data access layers, and security patterns. A full entity conversion can take a meaningful chunk of time to run.
+This is the challenge I ran into building the Claude Winforms Conversion Agent, a suite of 10 specialized TypeScript agents designed to systematically analyze and convert legacy VB.NET Windows Forms applications into modern ASP.NET Core MVC architecture. If you want the backstory on how I got to building something like this, [Nine Months in the Trenches of Agentic Development](/posts/nine-months-in-the-trenches) covers the learning curve, what I got wrong the first two months, and what eventually stuck. The orchestrator runs agents sequentially, each one building on the last, processing thousands of lines of legacy code across forms, business objects, data access layers, and security patterns. A full entity conversion can take a meaningful chunk of time to run.
 
 And I don't always have the luxury of sitting at my desk waiting for it.
 
@@ -324,7 +324,7 @@ ssh devbox && tmux attach -t bargeops
 
 ## The Bigger Picture
 
-There's a philosophical shift happening in how we develop software. AI agents are doing the tedious extraction work: parsing legacy code, mapping UI components, generating boilerplate. But they still need humans in the loop: to kick them off, to review their output, to guide the interactive generation steps.
+There's a philosophical shift happening in how we develop software. AI agents are doing the tedious extraction work: parsing legacy code, mapping UI components, generating boilerplate. But they still need humans in the loop: to kick them off, to review their output, to guide the interactive generation steps. I've written about both sides of that shift: [I Haven't Typed Code in Months](/posts/i-havent-typed-code-in-months) on what the day-to-day actually looks like when you're deep in it, and [Building Software with AI Is Addictive](/posts/building-with-ai-is-addictive) on why you can't stop — which is exactly why the remote monitoring setup matters. When the agents work while you live your life, the addiction becomes sustainable.
 
 The infrastructure described here (Tailscale for networking, SSH for access, tmux for persistence) is what makes that human-in-the-loop model actually ergonomic. You're not chained to your desk for the parts that don't need you there. You show up for the parts that do.
 

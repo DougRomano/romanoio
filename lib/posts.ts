@@ -5,6 +5,9 @@ import readingTime from 'reading-time';
 
 const POSTS_DIR = path.join(process.cwd(), 'content/posts');
 
+/** Posts per page on /blog (keep in sync with homepage “latest” count if desired). */
+export const BLOG_POSTS_PER_PAGE = 20;
+
 export interface PostMeta {
   slug: string;
   title: string;

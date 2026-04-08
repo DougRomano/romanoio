@@ -2,13 +2,13 @@
 title: "Constitutional AI Context: How to Structure Rules That Don't Drift"
 date: "2026-03-26"
 excerpt: "We had a workflow: end of every session, ask Claude to update the memory files with what we learned. It worked until we added UI specialists, dedicated agents, and more parallel sessions. All additive. None checking what the others had written. Here's the governance model that stopped it."
-tags: ["Claude Code", "AI", ".NET", "Software Architecture", "Team Collaboration", "Developer Productivity"]
+tags: ["Claude Code", "AI", ".NET", "Software Architecture", "Team Collaboration", "Developer Productivity", "Context Window", "Agentic Development"]
 series: "AI Context Engineering for .NET Teams"
 seriesOrder: 4
 image: "/post-images/constitutional-ai-context.png"
 ---
 
-Parts 1 through 3 of this series tell the story of a `CLAUDE.md` that got out of control: context bloat, then structural chaos, then five outdated patterns shipping silently to production. If you read those posts thinking the problem was technical — too many files, wrong architecture, stale code samples — this post is the correction. The technical issues were symptoms. The root cause was governance.
+Parts 1 through 3 of this series tell the story of a `CLAUDE.md` that got out of control: context bloat, then structural chaos, then five outdated patterns shipping silently to production. If you read those posts thinking the problem was technical — too many files, wrong architecture, stale code samples — this post is the correction. The technical issues were symptoms. The root cause was governance. And governance matters because AI doesn't just propagate your outdated patterns — as [Your Tech Debt Has a New Co-Author](/posts/your-tech-debt-has-a-new-co-author) describes, it amplifies them at machine speed. Bad architecture in a memory file doesn't accumulate slowly. It reproduces itself in every session.
 
 Here's how we actually got there.
 
@@ -118,6 +118,8 @@ Every section that has an implementation counterpart in a skill ends with that p
 Agents are the orchestration layer. They run parallel work sessions against different parts of the codebase, each scoped to a role: API layer, UI layer, testing, git workflow. An `api-architect` agent knows the API stack. A `ui-architect` agent knows the Razor Pages conventions. They can run simultaneously without colliding because their constitutional scope is declared and non-overlapping.
 
 The critical distinction from skills: agents are **always loaded**, not on-demand. They appear as a dedicated line in `/context` output and burn tokens in every session whether you invoke them explicitly or not. That changes the design constraint. An agent that contains code samples and step-by-step procedures is doing the skill's job, wasting always-on budget for content that should be on-demand.
+
+Where agents add governance value is in multi-session parallel work. The infrastructure that makes five or six parallel sessions ergonomic is covered in [Claude Remote Agents: Running 10 AI Agents While You're Not at Your Desk](/posts/remote-developer-edge-tmux-tailscale) — the tmux + Tailscale setup that keeps those sessions alive and accessible. The constitutional model here is what keeps them from generating contradictory patterns while they run independently.
 
 The right agent is thin. It declares its constitutional scope, names the skills it delegates to, and says nothing else procedural:
 
@@ -265,4 +267,4 @@ The goal isn't a perfect governance system on day one. The goal is a system that
 
 ---
 
-*Doug is a .NET architect at CSG Solutions leading the BargeOps modernization project, converting 195k+ lines of legacy VB.NET WinForms to ASP.NET Core Razor Pages using Claude Code's agent system. He writes about AI-assisted development, context management, and enterprise modernization patterns.*
+*Doug is a .NET architect at CSG Solutions leading the BargeOps modernization project, converting 195k+ lines of legacy VB.NET WinForms to ASP.NET Core Razor Pages using Claude Code's agent system. He writes about AI-assisted development, context management, and enterprise modernization patterns. The full backstory on how this project came together is in [Nine Months in the Trenches of Agentic Development](/posts/nine-months-in-the-trenches) — and the lessons about why context quality matters are rooted in [Most of the Code AI Learned From Is Garbage](/posts/most-code-ai-learned-from-is-garbage).*

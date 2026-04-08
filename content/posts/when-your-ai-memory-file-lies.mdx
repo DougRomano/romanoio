@@ -2,7 +2,7 @@
 title: "When Your AI Memory File Lies: 5 Outdated Patterns We Were Shipping to Production"
 date: "2026-03-25"
 excerpt: "Claude was confidently generating deprecated code. We trusted the memory file. Here's what we found and why these bugs are invisible to code review."
-tags: ["Claude Code", "AI", ".NET", "Code Quality", "Technical Debt", "Developer Productivity"]
+tags: ["Claude Code", "AI", ".NET", "Code Quality", "Technical Debt", "Developer Productivity", "Context Window"]
 series: "AI Context Engineering for .NET Teams"
 seriesOrder: 3
 image: "/post-images/when-your-ai-memory-file-lies-og.png"
@@ -10,11 +10,11 @@ image: "/post-images/when-your-ai-memory-file-lies-og.png"
 
 Here's something that isn't in the Claude Code documentation: your `CLAUDE.md` can be wrong. Not obviously wrong. Compile-and-pass-tests wrong.
 
-A stale wiki page sits there waiting for someone to stumble on it. A stale `CLAUDE.md` actively shapes every output Claude generates — every conversation, every scaffold, every PR. The bad pattern doesn't sit idle. It ships.
+A stale wiki page sits there waiting for someone to stumble on it. A stale `CLAUDE.md` actively shapes every output Claude generates — every conversation, every scaffold, every PR. The bad pattern doesn't sit idle. It ships. This is the specific mechanism behind what I described in [Your Tech Debt Has a New Co-Author](/posts/your-tech-debt-has-a-new-co-author): AI amplifies the patterns it finds, including the wrong ones. In that post the amplification came from a messy codebase. Here it came from the memory file that was supposed to prevent that.
 
 When we audited our memory files during [the context refactoring described in Part 2](/posts/monolith-to-skills-architecture), we found what we weren't looking for: contradictions. Patterns that described how we *used* to build things, not how we build them now. Rules that conflicted with each other.
 
-The code those rules generated compiled cleanly. Tests passed. CI was quiet. The bugs went to production because the patterns were architecturally correct — just architecturally outdated. Nobody flags that in code review.
+The code those rules generated compiled cleanly. Tests passed. CI was quiet. The bugs went to production because the patterns were architecturally correct — just architecturally outdated. Nobody flags that in code review. It's the same invisible failure mode as [Most of the Code AI Learned From Is Garbage](/posts/most-code-ai-learned-from-is-garbage): the problem isn't wrong-looking code, it's plausible-but-wrong code that passes every automated check because the error is architectural, not syntactic.
 
 Here are the five we found.
 

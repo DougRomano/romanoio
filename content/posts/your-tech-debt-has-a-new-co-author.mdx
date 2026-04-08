@@ -2,7 +2,7 @@
 title: "Your Tech Debt Has a New Co-Author"
 date: "2026-02-12"
 excerpt: "AI doesn't introduce bad patterns into your codebase. It amplifies the ones that are already there, at machine speed."
-tags: ["AI", "Code Quality", "Software Architecture", ".NET", "Developer Productivity"]
+tags: ["AI", "Code Quality", "Software Architecture", ".NET", "Developer Productivity", "Claude Code"]
 ---
 
 AI doesn't introduce bad patterns into your codebase. It amplifies the ones that are already there.
@@ -16,6 +16,8 @@ When you point an AI agent at a production system, you're not adding something n
 I work in .NET systems that have history. Decisions made five years ago by developers who are long gone. Business logic that migrated from services into controllers when a deadline was close. Abstractions that made sense in one context and calcified into obstacles in three others. Every codebase has this. It's not a failure. It's entropy.
 
 The AI agent doesn't see entropy. It sees examples. And it follows them.
+
+There's a compounding layer underneath this that doesn't get discussed enough: the model didn't arrive at your codebase neutral. It was trained on the internet, which means it arrived pre-loaded with every anti-pattern the open source world ever published. I wrote about that side of the problem in [Most of the Code AI Learned From Is Garbage](/posts/most-code-ai-learned-from-is-garbage). What happens in production is the intersection: a model biased toward popular-but-wrong patterns, pointed at a codebase full of its own accumulated shortcuts. The amplification works in both directions at once.
 
 Point it at a system where domain logic routinely leaks into controllers, and it will write domain logic in controllers because that's the dominant pattern in the context window. Ask it to add a new service in a codebase where half the services do too much, and it will happily write you another one that does too much. It's not making a mistake. It's doing exactly what you trained it to do by showing it a thousand examples of what "normal" looks like in your system.
 
@@ -58,3 +60,5 @@ The developers who are going to drown in AI-generated tech debt aren't the slow 
 Shipping fast matters. It's one of the genuine advantages AI tooling gives you, and you should use it. But the codebase you're shipping into has a gravity. Left unmanaged, your agent will follow it. Every time. Without complaint. At whatever speed you give it.
 
 Your tech debt has a new co-author. Make sure you're both working from the same blueprint.
+
+I've been building production .NET systems this way for the better part of a year, and the teams that navigate this well are the ones who treat CLAUDE.md like a living architecture document — not a one-time setup. Nine months of doing it in the trenches is documented in [Nine Months in the Trenches of Agentic Development](/posts/nine-months-in-the-trenches) — the learning curve, the failures, and what actually works in production.

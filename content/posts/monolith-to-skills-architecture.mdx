@@ -2,7 +2,7 @@
 title: "From Monolith to Skills Architecture: An 82% Reduction in Always-Loaded AI Context"
 date: "2026-03-24"
 excerpt: "A 564-line CLAUDE.md became a 23-line router. Eleven memory files became seven on-demand skills. Always-loaded context dropped 82%. The procedural knowledge didn't disappear. It grew. Here's the full arc."
-tags: ["Claude Code", "AI", ".NET", "Context Window", "Developer Productivity", "Software Architecture"]
+tags: ["Claude Code", "AI", ".NET", "Context Window", "Developer Productivity", "Software Architecture", "SpecKit"]
 series: "AI Context Engineering for .NET Teams"
 seriesOrder: 2
 image: "/post-images/monolith-to-skills-architecture-og.svg"
@@ -14,13 +14,13 @@ Over several months of AI-assisted development on a production .NET MonoRepo (UI
 
 ## Phase One: The Monolith
 
-When we first adopted Claude Code for WinForms rewrite (a .NET monorepo with an ASP.NET Core Web API using Dapper and SQL Server, plus an MVC/Razor Pages UI), we did what most teams do: we put everything into `CLAUDE.md`.
+When we first adopted Claude Code for WinForms rewrite (a .NET monorepo with an ASP.NET Core Web API using Dapper and SQL Server, plus an MVC/Razor Pages UI), we did what most teams do: we put everything into `CLAUDE.md`. If you want the context for how we got to this project in the first place, [Nine Months in the Trenches of Agentic Development](/posts/nine-months-in-the-trenches) covers the learning curve. The monolith phase we're about to describe is something most teams hit in their first two or three months.
 
 Every pattern. Every convention. Every edge case we'd been bitten by. The file grew to **564 lines** covering architecture, repository patterns, ListQuery pagination, delete and soft-delete behavior, audit fields, UI standards, DataTables configuration, authorization, transactions, exception types, DTO flow, XSS prevention, and more.
 
 The content was correct. All hard-won from real mistakes. The problem was **cost**. Every conversation, every prompt, loaded all 564 lines into context whether the task needed it or not. Asking Claude to fix a typo in a Razor view burned the same token budget as a full entity scaffolding operation.
 
-Each time Claude got something wrong, the instinct was the same: add a rule. The file became an archaeological record of every mistake, with no mechanism to expire or supersede old entries.
+Each time Claude got something wrong, the instinct was the same: add a rule. The file became an archaeological record of every mistake, with no mechanism to expire or supersede old entries. This is why [Most of the Code AI Learned From Is Garbage](/posts/most-code-ai-learned-from-is-garbage) matters for CLAUDE.md hygiene too: a monolithic context file accumulates outdated rules the same way the internet accumulates outdated tutorials. The model follows whatever it sees, however old it is.
 
 ---
 
@@ -230,7 +230,7 @@ The constitution carries a version number (`1.10.0`) and ratification date. Skil
 
 ---
 
-*Net diff for this refactoring: 1,335 insertions, 1,575 deletions across 32 files. We added more procedural detail than we had before, deleted 11 memory files, and cut always-loaded context from ~1,800 lines to ~326. The knowledge grew. The cost shrank.*
+*Net diff for this refactoring: 1,335 insertions, 1,575 deletions across 32 files. We added more procedural detail than we had before, deleted 11 memory files, and cut always-loaded context from ~1,800 lines to ~326. The knowledge grew. The cost shrank. For context on the multi-agent setup this architecture was built to support — the 10 specialized agents running in parallel that created the original pressure — see [Claude Remote Agents: Running 10 AI Agents While You're Not at Your Desk](/posts/remote-developer-edge-tmux-tailscale).*
 
 **Next in this series:** The memory file refactoring solved the bloat problem, but it exposed a darker issue. Some of those old patterns were flat-out wrong, and we'd been shipping them to production. [Read Part 3 →](/blog/when-your-ai-memory-file-lies)
 
