@@ -16,7 +16,7 @@ export default function HomePage() {
           AI-First Developer.
         </h1>
         <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl leading-relaxed mb-10">
-          I spent two decades building .NET systems the traditional way. Now I build with AI agents,
+          I spent three decades building .NET systems the traditional way. Now I build with AI agents,
           Claude Code, and agentic workflows — and I write honestly about what that transition
           actually looks like in production.
         </p>
