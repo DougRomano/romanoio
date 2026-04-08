@@ -13,12 +13,12 @@ export default function PostCard({ post }: Props) {
       <Link href={`/blog/${post.slug}`} className="block">
         {/* Thumbnail */}
         {post.image && (
-          <div className="relative w-full aspect-[1200/400] overflow-hidden">
+          <div className="relative w-full aspect-[1200/630] overflow-hidden">
             <Image
               src={post.image}
               alt={post.title}
               fill
-              className="object-cover object-top group-hover:scale-[1.02] transition-transform duration-300"
+              className="object-cover object-center group-hover:scale-[1.02] transition-transform duration-300"
               sizes="(max-width: 768px) 100vw, 800px"
             />
           </div>
