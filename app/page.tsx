@@ -3,7 +3,7 @@ import PostCard from '@/components/PostCard';
 import { getAllPosts } from '@/lib/posts';
 
 export default function HomePage() {
-  const latestPosts = getAllPosts().slice(0, 3);
+  const latestPosts = getAllPosts().slice(0, 10);
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6">
