@@ -6,7 +6,7 @@ excerpt: "Narrate your architecture. Let SpecKit turn it into a spec, a plan, ta
 tags: ["AI", "Claude Code", ".NET", "Software Architecture", "Developer Productivity", "ASP.NET", "SpecKit", "Agentic Development"]
 ---
 
-I've been narrating architecture decisions for a while: first with VoiceInk dictating into IDE, now with Claude Desktop built-in voice mode. The input method changed. The workflow didn't. What actually changed the game was SpecKit: the pipeline that takes what I said at the whiteboard and drives it to working code without touching the keyboard again. If you want the origin story for how I got to working this way, [I Haven't Typed Code in Months. I've Never Shipped More.](/posts/i-havent-typed-code-in-months) is where it started, and [Nine Months in the Trenches of Agentic Development](/posts/nine-months-in-the-trenches) covers how nine months of building production systems this way gets you to a workflow like this one.
+I've been narrating architecture decisions for a while: first with VoiceInk dictating into IDE, now with Claude Desktop built-in voice mode. The input method changed. The workflow didn't. What actually changed the game was SpecKit: the pipeline that takes what I said at the whiteboard and drives it to working code without touching the keyboard again. If you want the origin story for how I got to working this way, [I Haven't Typed Code in Months. I've Never Shipped More.](/blog/i-havent-typed-code-in-months) is where it started, and [Nine Months in the Trenches of Agentic Development](/blog/nine-months-in-the-trenches) covers how nine months of building production systems this way gets you to a workflow like this one.
 
 Here's why it matters for .NET developers.
 
@@ -16,7 +16,7 @@ Voice input gets you out of the chair. SpecKit is why that matters.
 
 SpecKit is a sequence of slash commands that takes a narrated description and produces a working implementation. Four commands, in order: `/speckit-specify`, `/speckit-plan`, `/speckit-tasks`, `/speckit-implement`.
 
-The context engineering that makes SpecKit work at scale, keeping always-loaded context lean so the pipeline has headroom, is covered in the four-part AI Context Engineering series: [Part 1: Stop Paying the Marketing Tax](/posts/stop-paying-the-marketing-tax), [Part 2: From Monolith to Skills Architecture](/posts/monolith-to-skills-architecture), [Part 3: When Your AI Memory File Lies](/posts/when-your-ai-memory-file-lies), and [Part 4: Constitutional AI Context](/posts/constitutional-ai-context). This post is what that infrastructure enables.
+The context engineering that makes SpecKit work at scale, keeping always-loaded context lean so the pipeline has headroom, is covered in the four-part AI Context Engineering series: [Part 1: Stop Paying the Marketing Tax](/blog/stop-paying-the-marketing-tax), [Part 2: From Monolith to Skills Architecture](/blog/monolith-to-skills-architecture), [Part 3: When Your AI Memory File Lies](/blog/when-your-ai-memory-file-lies), and [Part 4: Constitutional AI Context](/blog/constitutional-ai-context). This post is what that infrastructure enables.
 
 **`/speckit-specify`** formalizes the narration into numbered requirements (`REQ-001`, `REQ-002`) with Given/When/Then acceptance criteria, a migration notes section if we're extracting logic from a legacy WinForms layer, and a spec file tied to the Jira ticket. This is not a document I draft afterward. It's the structured version of what I said at the board.
 
@@ -85,8 +85,8 @@ On a project like ours, a 275k+ line VB.NET-to-ASP.NET Core MVC migration runnin
 
 That's the actual change. Not the voice input. The pipeline it feeds.
 
-The mental model for why the pipeline matters is in [Stop Chatting with Your LLM. Start Compiling.](/posts/stop-chatting-start-compiling). SpecKit is the practical implementation of that idea: the narration compiles into a spec, the spec compiles into a plan, the plan compiles into working code. One pass of thinking, no lossy re-translation at each step.
+The mental model for why the pipeline matters is in [Stop Chatting with Your LLM. Start Compiling.](/blog/stop-chatting-start-compiling). SpecKit is the practical implementation of that idea: the narration compiles into a spec, the spec compiles into a plan, the plan compiles into working code. One pass of thinking, no lossy re-translation at each step.
 
-The remote dimension of this workflow, running SpecKit sessions from anywhere while agents work in persistent tmux sessions, is in [Claude Remote Agents: Running 10 AI Agents While You're Not at Your Desk](/posts/remote-developer-edge-tmux-tailscale). Voice input from your phone plus a persistent session on your dev machine means the architecture review can happen at the whiteboard, in the car, or at the coffee shop. The session is always there when you're ready.
+The remote dimension of this workflow, running SpecKit sessions from anywhere while agents work in persistent tmux sessions, is in [Claude Remote Agents: Running 10 AI Agents While You're Not at Your Desk](/blog/remote-developer-edge-tmux-tailscale). Voice input from your phone plus a persistent session on your dev machine means the architecture review can happen at the whiteboard, in the car, or at the coffee shop. The session is always there when you're ready.
 
-If you're newer to building .NET apps with AI and this workflow sounds advanced, [A Beginner's Guide to Building .NET Apps with AI](/posts/beginners-guide-building-dotnet-apps-with-ai) is the right starting point before coming back here.
+If you're newer to building .NET apps with AI and this workflow sounds advanced, [A Beginner's Guide to Building .NET Apps with AI](/blog/beginners-guide-building-dotnet-apps-with-ai) is the right starting point before coming back here.

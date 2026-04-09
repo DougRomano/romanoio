@@ -51,7 +51,7 @@ Each entry below names the **target post** (the older one to link TO) and sugges
 
 | Target (older) | Suggested anchor context |
 |----------------|--------------------------|
-| `most-code-ai-learned-from-is-garbage` (Jan 6) | When discussing how AI follows patterns it finds in your codebase — this is the companion piece on why AI's training data compounds the problem. _"I wrote about this from the training side — [most of the code AI learned from is garbage](/posts/most-code-ai-learned-from-is-garbage)"_ |
+| `most-code-ai-learned-from-is-garbage` (Jan 6) | When discussing how AI follows patterns it finds in your codebase — this is the companion piece on why AI's training data compounds the problem. _"I wrote about this from the training side — [most of the code AI learned from is garbage](/blog/most-code-ai-learned-from-is-garbage)"_ |
 | `nine-months-in-the-trenches` (Dec 22) | When you reference real agentic development experience — link as the foundational "nine months in" story that established the context for this post. |
 
 ---
@@ -62,7 +62,7 @@ Each entry below names the **target post** (the older one to link TO) and sugges
 
 | Target (older) | Suggested anchor context |
 |----------------|--------------------------|
-| `i-havent-typed-code-in-months` (Jan 27) | Natural companion — both are about the IDE and keyboard disappearing. _"The specifics of what replaced it are in [I Haven't Typed Code in Months](/posts/i-havent-typed-code-in-months)"_ |
+| `i-havent-typed-code-in-months` (Jan 27) | Natural companion — both are about the IDE and keyboard disappearing. _"The specifics of what replaced it are in [I Haven't Typed Code in Months](/blog/i-havent-typed-code-in-months)"_ |
 | `building-with-ai-is-addictive` (Jan 22) | When you describe why you don't miss Rider — the section on reclaiming the joy of building maps directly here. |
 | `nine-months-in-the-trenches` (Dec 22) | Opening section on how you got here — link as the full arc of the agentic journey. |
 
@@ -100,7 +100,7 @@ Each entry below names the **target post** (the older one to link TO) and sugges
 
 | Target (older) | Suggested anchor context |
 |----------------|--------------------------|
-| `stop-chatting-start-compiling` (Jan 14) | When explaining tool-calling and the agentic architecture MCP enables — Programmatic Tool Calling is the precursor concept. _"This is the architecture [Stop Chatting, Start Compiling](/posts/stop-chatting-start-compiling) described from the LLM side."_ |
+| `stop-chatting-start-compiling` (Jan 14) | When explaining tool-calling and the agentic architecture MCP enables — Programmatic Tool Calling is the precursor concept. _"This is the architecture [Stop Chatting, Start Compiling](/blog/stop-chatting-start-compiling) described from the LLM side."_ |
 | `nine-months-in-the-trenches` (Dec 22) | When establishing your credibility as a practitioner — the nine-months post is the proof of experience. |
 | `most-code-ai-learned-from-is-garbage` (Jan 6) | When you call out the scarcity of quality .NET AI content — the earlier post is about why quality patterns matter when AI is the author. |
 
@@ -112,7 +112,7 @@ Each entry below names the **target post** (the older one to link TO) and sugges
 
 | Target (older) | Suggested anchor context |
 |----------------|--------------------------|
-| `building-with-ai-is-addictive` (Jan 22) | **Strong pairing.** The addiction post is literally the setup for the brain fry post — the compulsive building is what causes the cognitive fatigue. _"I wrote in January that [building with AI is addictive](/posts/building-with-ai-is-addictive) — I meant it as a compliment. This is the other side of that coin."_ |
+| `building-with-ai-is-addictive` (Jan 22) | **Strong pairing.** The addiction post is literally the setup for the brain fry post — the compulsive building is what causes the cognitive fatigue. _"I wrote in January that [building with AI is addictive](/blog/building-with-ai-is-addictive) — I meant it as a compliment. This is the other side of that coin."_ |
 | `i-havent-typed-code-in-months` (Jan 27) | When describing the intensity of deep agentic sessions — that post captures what a day-in-the-life at that velocity actually looks like. |
 | `nine-months-in-the-trenches` (Dec 22) | When establishing that this isn't a dabbler's problem — it's what sustained agentic development feels like. |
 
@@ -125,7 +125,7 @@ Each entry below names the **target post** (the older one to link TO) and sugges
 | Target (older) | Suggested anchor context |
 |----------------|--------------------------|
 | `nine-months-in-the-trenches` (Dec 22) | _"For a deeper look at what sustained agentic development actually feels like..."_ — send readers to the origin story. |
-| `most-code-ai-learned-from-is-garbage` (Jan 6) | When covering guardrails and patterns — essential reading for anyone starting out. _"The single most important habit I'd recommend is in [this post](/posts/most-code-ai-learned-from-is-garbage)."_ |
+| `most-code-ai-learned-from-is-garbage` (Jan 6) | When covering guardrails and patterns — essential reading for anyone starting out. _"The single most important habit I'd recommend is in [this post](/blog/most-code-ai-learned-from-is-garbage)."_ |
 | `i-havent-typed-code-in-months` (Jan 27) | As a "where this leads" forward reference for beginners — show them the destination. |
 | `result-pattern-dotnet` (Jan 2025) | If you add any section on error handling patterns or .NET best practices — this is the foundational post. |
 | `sql-index-tuning-fundamentals` (Feb 2025) | If you mention SQL or database work — the oldest technical post deserves a mention as essential .NET craftsmanship. |
@@ -197,7 +197,7 @@ This is the newest post and the richest cross-link opportunity. It should reach 
 | `monolith-to-skills-architecture` (Mar 24) — _Series Part 2_ | When SpecKit skills load on demand — the architecture that makes that work is described in Part 2. |
 | `when-your-ai-memory-file-lies` (Mar 25) — _Series Part 3_ | When describing how SpecKit specs prevent drift — the context that keeps Claude accurate. |
 | `constitutional-ai-context` (Mar 26) — _Series Part 4_ | When introducing SpecKit governance across a team — the governance model this operates within. |
-| `remote-developer-edge-tmux-tailscale` (Feb 27) | When describing hands-free/remote operation — the tmux/Tailscale post is the infrastructure layer beneath this workflow. _"The same remote setup from [this post](/posts/remote-developer-edge-tmux-tailscale) means voice input works even when I'm not at my desk."_ |
+| `remote-developer-edge-tmux-tailscale` (Feb 27) | When describing hands-free/remote operation — the tmux/Tailscale post is the infrastructure layer beneath this workflow. _"The same remote setup from [this post](/blog/remote-developer-edge-tmux-tailscale) means voice input works even when I'm not at my desk."_ |
 | `i-havent-typed-code-in-months` (Jan 27) | Voice mode is the next evolution of not typing — that post is the first chapter of this story. |
 | `stop-chatting-start-compiling` (Jan 14) | When SpecKit compiles narration into structured artifacts — the "LLM as compiler" metaphor fits perfectly. |
 | `beginners-guide-building-dotnet-apps-with-ai` (Mar 16) | As a "where this workflow leads" destination for beginners reading that post — and here as a "for the .NET beginner" anchor. |

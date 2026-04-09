@@ -9,7 +9,7 @@ I Went Looking for .NET MCP Content. I Didn't Find Much.
 
 Model Context Protocol is everywhere. Claude Code uses it to talk to my filesystem. Agent Framework treats MCP servers as first-class citizens. Azure Functions went GA with MCP hosting support in January. Visual Studio 2026 shipped with MCP integration baked into its agent instruction files. Even GitHub Copilot adopted it.
 
-MCP is the USB-C of AI tooling. One protocol, universal connectivity. Build a server once, and Claude Code can use it. Copilot can use it. Your Agent Framework agents can use it. Any future client that speaks the protocol can use it. Before MCP, every framework invented its own tool-calling mechanism. Semantic Kernel had plugins. LangChain had tools. AutoGen had function calls. None of them talked to each other. Anthropic addressed the inefficiency of that multi-step round-tripping at the model level too — [Stop Chatting with Your LLM. Start Compiling.](/posts/stop-chatting-start-compiling) covers Programmatic Tool Calling, which is the complementary shift on the inference side to what MCP handles on the integration side.
+MCP is the USB-C of AI tooling. One protocol, universal connectivity. Build a server once, and Claude Code can use it. Copilot can use it. Your Agent Framework agents can use it. Any future client that speaks the protocol can use it. Before MCP, every framework invented its own tool-calling mechanism. Semantic Kernel had plugins. LangChain had tools. AutoGen had function calls. None of them talked to each other. Anthropic addressed the inefficiency of that multi-step round-tripping at the model level too — [Stop Chatting with Your LLM. Start Compiling.](/blog/stop-chatting-start-compiling) covers Programmatic Tool Calling, which is the complementary shift on the inference side to what MCP handles on the integration side.
 
 That's over now. MCP won.
 
@@ -71,7 +71,7 @@ The developers who might have been building MCP servers were busy figuring out w
 
 ## What I Built Instead, And Why MCP Would Have Made It Better
 
-I want to tell you about something I've been building for the last six to nine months, because it illustrates both how powerful agents already are and how much more powerful they'd be with MCP. The full context for how I got to building production agentic systems is in [Nine Months in the Trenches of Agentic Development](/posts/nine-months-in-the-trenches) — this section describes where that work led.
+I want to tell you about something I've been building for the last six to nine months, because it illustrates both how powerful agents already are and how much more powerful they'd be with MCP. The full context for how I got to building production agentic systems is in [Nine Months in the Trenches of Agentic Development](/blog/nine-months-in-the-trenches) — this section describes where that work led.
 
 I built a multi-agent conversion system. Ten specialized agents, orchestrated by a master orchestrator, designed to systematically migrate legacy desktop applications to modern web architecture. Not a proof of concept. A production tool that my team uses to convert real enterprise entities from a codebase that's been running for over fifteen years.
 
@@ -139,7 +139,7 @@ That MCP server is now running on an Azure Function with HTTP+SSE transport. Cla
 
 ## The First-Mover Opportunity
 
-The content gap problem isn't new in the .NET AI ecosystem. I wrote about a closely related one — that most AI training data is low-quality open source and tutorial code — in [Most of the Code AI Learned From Is Garbage](/posts/most-code-ai-learned-from-is-garbage). The implication for MCP is the same: if the content that exists is thin, the models will produce thin MCP implementations. Better community content isn't just good for developers learning; it raises the baseline for what AI agents produce when asked to build MCP servers in C#.
+The content gap problem isn't new in the .NET AI ecosystem. I wrote about a closely related one — that most AI training data is low-quality open source and tutorial code — in [Most of the Code AI Learned From Is Garbage](/blog/most-code-ai-learned-from-is-garbage). The implication for MCP is the same: if the content that exists is thin, the models will produce thin MCP implementations. Better community content isn't just good for developers learning; it raises the baseline for what AI agents produce when asked to build MCP servers in C#.
 
 Think about the developers who wrote the first ASP.NET Web API blog posts. Or the ones who documented Entity Framework patterns before the official docs caught up. Or the ones who wrote about dependency injection in .NET before Microsoft built it into the framework. They became recognized authorities not because they were the best programmers, but because they were the first to document their experience publicly.
 

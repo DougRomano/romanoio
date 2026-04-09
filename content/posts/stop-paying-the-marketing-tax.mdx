@@ -14,7 +14,7 @@ I was burning ~550 tokens per session on marketing plugins I never installed int
 
 ## Background: What Is the Context Window and Why Should You Care?
 
-If you're using Claude Code for serious development work (large codebases, multi-agent orchestration, long conversion sessions), the context window is your most precious resource. If you're earlier in that journey and wondering what "serious development work" looks like in practice, [Nine Months in the Trenches of Agentic Development](/posts/nine-months-in-the-trenches) covers how a production agentic project evolves to the point where a 3,000-token audit actually matters.
+If you're using Claude Code for serious development work (large codebases, multi-agent orchestration, long conversion sessions), the context window is your most precious resource. If you're earlier in that journey and wondering what "serious development work" looks like in practice, [Nine Months in the Trenches of Agentic Development](/blog/nine-months-in-the-trenches) covers how a production agentic project evolves to the point where a 3,000-token audit actually matters.
 
 Claude Code (running Opus 4.6) has a 200k token context window. That sounds enormous until you realize your baseline overhead is already consuming a significant chunk of it before you write a single line of code.
 
@@ -203,7 +203,7 @@ If I can get CLAUDE.md from 7.3k to ~4k, my total baseline drops from 30k to ~27
 
 Claude Code's plugin and skills ecosystem is maturing fast. With community marketplaces, Anthropic's own knowledge-work plugins, and third-party tool suites all installing into the same `~/.claude/` directory, **context bloat from unintended installs is a real problem**, especially if you use Claude in multiple contexts (development, Cowork, etc.).
 
-Get into the habit of running `/context` at the start of new projects and periodically during long engagements. Think of it the same way you'd think about reviewing your npm `node_modules` or NuGet packages. Things accumulate, and periodic audits keep the environment clean. The principle here is the same one I described in [Most of the Code AI Learned From Is Garbage](/posts/most-code-ai-learned-from-is-garbage): what's in context shapes what the model produces. Garbage in, garbage out — and unnecessary plugin context is the context window equivalent of dependency bloat.
+Get into the habit of running `/context` at the start of new projects and periodically during long engagements. Think of it the same way you'd think about reviewing your npm `node_modules` or NuGet packages. Things accumulate, and periodic audits keep the environment clean. The principle here is the same one I described in [Most of the Code AI Learned From Is Garbage](/blog/most-code-ai-learned-from-is-garbage): what's in context shapes what the model produces. Garbage in, garbage out — and unnecessary plugin context is the context window equivalent of dependency bloat.
 
 Your context window is your workspace. Keep it clean.
 
