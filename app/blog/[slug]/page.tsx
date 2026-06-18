@@ -141,7 +141,7 @@ export default function PostPage({ params }: Props) {
             {seriesNav.seriesTitle}
           </p>
           <p className="text-xs font-medium uppercase tracking-wide text-gray-600 dark:text-gray-200 mb-3">
-            Part {seriesNav.partIndex} of {seriesNav.partCount}
+            Part {seriesNav.partIndex}
           </p>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm border-t border-gray-200 dark:border-gray-500 pt-3">
             <div>
