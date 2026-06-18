@@ -1,0 +1,332 @@
+---
+title: "The Constitution in Production: A Guided Tour of the Agents, Skills, and Rules Governing 195k Lines"
+date: "2026-06-18"
+excerpt: "Part 4 gave you the governance model on paper. This is what it actually became three months later: the real constitution, eighteen agents, the skill catalog, the rule sheets, and the SpecKit lifecycle wiring it all together. Names, versions, and code pulled straight from the repo."
+tags: ["Claude Code", "AI", ".NET", "Software Architecture", "Agentic Development", "SpecKit", "Context Window", "Developer Productivity"]
+series: "AI Context Engineering for .NET Teams"
+seriesOrder: 6
+image: "/post-images/constitution-in-production.png"
+---
+
+[Part 4 of this series](/blog/constitutional-ai-context) gave you the governance model: five tiers, a versioned constitution, the precedence declaration pattern, an amendment process. Clean diagram, clean prose. The kind of thing that looks great in a blog post and makes you wonder whether the author actually runs it or just drew it.
+
+So here's the correction to my own post. The model held. The implementation specialized, hard. The two tidy agents I showed you (`api-architect`, `ui-architect`) are now eighteen. The `.cursor/rules/*.mdc` hints I called Tier 5 moved into `.claude/rules/*.md` and grew teeth. The constitution went from v1.10.0 to v1.13.0. And the whole thing got wired into Spec-Kit, so the governance isn't a document you're supposed to remember. It's a lifecycle you run.
+
+This post is a guided tour of the real thing. Every version number, agent name, rule ID, and code block below is pulled out of the BargeOps repo as it stands today. No idealized examples. If something looks messier than the Part 4 diagram, that's expected. This is what eight-plus months of a 195k-line VB.NET-to-ASP.NET-Core conversion does to a governance system that's actually load-bearing.
+
+We'll walk it top down, the way Claude reads it: the constitution, the agents that enforce it, the skills they delegate to, the rule sheets that catch drift in a diff, and the SpecKit lifecycle that ties them together.
+
+---
+
+## Tier 0: The Map at the Top
+
+Before any of the tiers, there's the router. `CLAUDE.md` still does exactly one job. It tells you where the real rules live and declares the pecking order. The first thing it states after the stack line is the non-negotiable, and then it hands off:
+
+```markdown
+## Non-Negotiables
+
+- No database migration scripts in this repo; schema is owned by the DBA team.
+- CreateUser / ModifyUser = operator email.
+  UI: ICurrentUserService.GetAuditUsername() / SetAuditFields();
+  API: HttpContext.GetForwardedUserOrIdentityName().
+  See .specify/memory/constitution.md § Audit user identity and /api-patterns § audit fields.
+```
+
+Two rules at the top of the router, both pointing down to where they're actually governed. The router asserts almost nothing on its own authority. It routes. That discipline from Part 4 survived contact with reality.
+
+What changed since Part 4 is how much it routes to. The "Key References" block is now a switchboard into five rule sheets, nine-plus skills, and a roster of agents grouped by what they review: PR/diff, full-file C#/SQL, full-file UI, end-to-end data flow. We'll hit each of those. Start with the document they all answer to.
+
+---
+
+## Tier 1: The Constitution, Three Minor Versions Later
+
+`.specify/memory/constitution.md` is the law. The Part 4 version was 1.10.0. Today:
+
+```markdown
+**Version**: 1.13.0 | **Ratified**: 2026-01-23 | **Last Amended**: 2026-06-10
+```
+
+The version bumps aren't decoration. Each one is a recorded amendment. And the amendments don't live in a separate changelog you'll forget to read. They live in an HTML comment at the very top of the file, the Sync Impact Report. Here's the real header from the most recent one:
+
+```markdown
+<!--
+SYNC IMPACT REPORT
+==================
+Version change : 1.12.0 to 1.13.0 (MINOR)
+Rationale      : Audit user identity standardized. CreateUser/ModifyUser must store
+                 the operator's email (not login username / Identity.Name);
+                 documented in Principle V, G7, api-patterns, and agent rule corpora.
+Modified principles
+ - V.   Data Integrity and Auditing   (rationale added; marked NON-NEGOTIABLE)
+Added sections
+ - Feature-domain rules, §4 Audit user identity (email for CreateUser/ModifyUser; ...)
+ ...
+Templates status :
+ OK  .specify/templates/plan-template.md      (Constitution Check section already aligns)
+ OK  .claude/commands/speckit.constitution.md (no hardcoded principle list)
+Follow-up TODOs : none
+-->
+```
+
+That single block is the amendment process from Part 4, made concrete. It records what changed, why, which principles moved, and which downstream templates were checked for alignment. When v1.12.0 became v1.13.0 because we standardized audit fields on email instead of login name, the report named every place that change had to propagate. That's the difference between a constitution that drifts and one that doesn't. The amendment carries its own blast radius.
+
+The five core principles are unchanged in spirit but sharpened in wording, and they're explicitly priority-ordered now:
+
+```markdown
+## Core Principles
+*Listed in priority order. When two principles conflict, the one listed first wins.*
+
+  I.   WinForms Parity First
+  II.  Spec-Driven Conversion
+  III. API-First, Clean Layers
+  IV.  UI Standardization
+  V.   Data Integrity and Auditing  (NON-NEGOTIABLE)
+```
+
+Priority order matters more than it sounds. When the UI standard (IV) and parity (I) disagree about whether to drop a legacy field, the constitution doesn't leave it to vibes. Parity wins because it's listed first. Principle V is the one that can never be waived by an entity spec:
+
+> Rationale: The DBA team owns schema; this codebase owns audit correctness. A mis-stamped audit row or a half-committed transaction is unrecoverable without DBA forensics, and the cost of a single production incident is larger than the cost of enforcing the rule every PR. This is the only principle that cannot be waived by entity spec.
+
+The other big change from the published model is that the constitution now carries a documentation hierarchy table at the top. It tells you, by topic, which tier owns the answer: principles here, procedures in skills, full-file rule corpora in agents, diff-scoped checklists in rule sheets. The constitution closes by stating its own supremacy and the only legal way to change it:
+
+```markdown
+## Governance
+
+Supremacy: This constitution trumps every skill, agent, rule sheet, cursor rule, and CLAUDE.md.
+
+Amendments: Amend only via /speckit.constitution. Each amendment produces a new Sync Impact
+Report and an updated version line at the bottom.
+
+Semver policy:
+- MAJOR: a principle removed/renamed, or narrowed in a way that breaks existing entity specs.
+- MINOR: a new principle, a new section, or a materially expanded principle.
+- PATCH: wording clarifications, typo fixes, pointer updates.
+```
+
+You don't hand-edit this file. You run `/speckit.constitution`, which forces the Sync Impact Report and the version bump. The friction is deliberate. A document that governs AI output across the whole codebase shouldn't be easy to change on a whim.
+
+---
+
+## Tier 2: Agents, From Two to Eighteen
+
+This is where the published model and reality diverge most. Part 4 showed two thin orchestrators. The repo has eighteen agent files, and they split cleanly into four jobs.
+
+**The orchestrator.** `pr-review` is the default for "review my changes." It doesn't carry the rules itself. It routes to the specialists and tells Claude not to improvise:
+
+```markdown
+Authoritative rule sources (do not drift):
+- Backend (.cs, .sql, shared DTOs): Apply the full rule tables in arch-reviewer.md
+  (LAYER, CTRL, SVC, REPO, SQL, DI, DTO, NAME). Cite the same Rule IDs (e.g. [CTRL-003]).
+- Frontend (.cshtml, .js, .css): Apply the full rule set in UI-Code-Review.md.
+- Do not invent shortened rule lists that could contradict those files.
+```
+
+It also carries an actual delegation table: finding shape on the left, specialist on the right.
+
+| Finding shape | Delegate to |
+|---|---|
+| `[RequirePermission]` missing / "Cookies" literal / child-modal `canModify` drift | `auth-policy-auditor` |
+| Hardcoded `<label>`, `<th>`, DataTables `title:` literal | `display-attribute-sweeper` |
+| `HandleListRequestAsync` wrong type-param count, `[Sortable]` on DTO, list SQL with WHERE/ORDER BY | `listquery-datatables-expert` |
+| Service missing `ValidateAndThrowAsync`, hand-rolled `new Model { … }`, concrete repo injection | `service-author` |
+| Bare-SELECT drift, missing `SCOPE_IDENTITY()`, absent FK-547 soft-delete fallback | `repository-sql-specialist` |
+
+**The full-file reviewers.** `arch-reviewer` owns backend `.cs`/`.sql`. `UI-Code-Review` owns `.cshtml`/`.js`/`.css`, and at 56KB it's the largest file in the whole kit, because UI drift has the most surface area. These hold the rule corpora, the actual ID'd rules like `CTRL-003`, `SQL-001`, `LAYER-002`. `pr-review` cites them. It doesn't redefine them, so each rule has one home.
+
+**The scaffolders.** `service-author` and `repository-sql-specialist` don't just review. They generate compliant code. Their value is that they write the boring, error-prone wiring correctly by construction. Here's `service-author`'s own red-flag list, which doubles as a compact statement of Principle III:
+
+```markdown
+## Red flags
+
+- Constructor takes a concrete <Entity>Repository instead of the interface (SVC-003).
+- Manual new <Entity> { Prop = dto.Prop, … } mapping instead of IObjectMapper (SVC-002).
+- Service method skips ValidateAndThrowAsync before a create or update (SVC-001).
+- Service reads HttpContext / ClaimsPrincipal / IHttpContextAccessor. That is the
+  controller's job (Principle III, services are host-agnostic).
+- Service returns Infrastructure Models.<Entity> for non-list operations (LAYER-006).
+```
+
+That last one is the audit rule from the constitution showing up at the agent level. The service never reads `HttpContext`, because audit-user stamping is the controller's job. The principle is stated once in `constitution.md` and enforced here with a rule ID you can grep for.
+
+**The specialists.** `listquery-datatables-expert`, `auth-policy-auditor`, `display-attribute-sweeper`, and `data-flow-tracer` each own one cross-cutting concern end to end. The ListQuery expert is my favorite example of why narrow agents beat one big reviewer. ListQuery plus DataTables is the trickiest pattern in the codebase because it straddles five files per entity (Model, DTO, Repository, Controller, JS) and breaks silently when any one drifts. The agent's whole job is to recognize the five symptoms and route each to the right rule:
+
+| # | Invariant | Canonical rule IDs |
+|---|---|---|
+| 1 | Attributes live on the Infrastructure Model, not DTO | LAYER-002, DTO-002, DTO-004 |
+| 2 | `HandleListRequestAsync<TDto, TModel>`, two params | CTRL-003 |
+| 3 | Bare-SELECT list SQL (no WHERE/ORDER BY/OFFSET) | SQL-001, SQL-002 |
+| 4 | camelCase `columns[*].data` (no PascalCase fallbacks) | UI-Code-Review.md |
+| 5 | Sort-arrow placement, `type:"text"` on numeric IDs | UI-Code-Review.md |
+
+**And the legacy family.** There are nine `legacy-*` agents (`legacy-form-structure-analyzer`, `legacy-data-access-analyzer`, `legacy-business-logic-extractor`, `legacy-security-extractor`, `legacy-validation-extractor`, `legacy-ui-component-mapper`, and three more) whose only job is to read the old VB.NET WinForms and emit structured metadata. These didn't exist in the Part 4 model, because Part 4 was about governance, not extraction. But in a conversion shop, half the agents aren't reviewing new code. They're mining the old code for the spec. I'll get to what they produce in the SpecKit section.
+
+Every agent shares the same frontmatter contract, and it's worth seeing, because it's what makes them invocable and scoped:
+
+```yaml
+---
+name: service-author
+description: "Use this agent when scaffolding or extending a service class ...
+  <example> ... </example>"
+model: sonnet
+color: blue
+memory: project
+---
+```
+
+The description carries `<example>` blocks so Claude knows when to reach for the agent, not just what it does. `model: sonnet` keeps review cheap. `memory: project` scopes it. The thin-agent principle from Part 4 survived. These agents declare scope and route to skills for recipes. They don't paste procedures inline.
+
+---
+
+## Tier 3: Skills, the Recipes the Agents Delegate To
+
+If agents are the *who*, skills are the *how*. They're on-demand, loaded by name (`/api-patterns`, `/datatables`), and they hold the copy-paste code. The frontmatter is deliberately minimal, just name and description:
+
+```yaml
+---
+name: api-patterns
+description: API implementation patterns for BargeOps Admin. ListQuery, delete,
+  service layer, current user, page load, transactions, audit fields, authorization.
+---
+```
+
+Every skill subordinates itself to the constitution in its own opening paragraph. This is the precedence declaration pattern from Part 4, in the wild:
+
+> Documentation hierarchy: constitution.md holds principles and governance. This skill holds API implementation recipes. If a principle in the constitution conflicts with a snippet here, follow the constitution and open a task to align this skill.
+
+The skill tells you to ignore it if it contradicts the law. That one sentence is what keeps a 400-line recipe file from quietly becoming a competing source of truth. Here's the actual ListQuery recipe it carries, the three-layer pattern that the `listquery-datatables-expert` agent defends:
+
+```csharp
+// Repository, IDbHelper.CreateQueryBuilderAsync()
+public async Task<ListQueryResult<Vendor>> GetVendorListAsync(
+    ListQueryDefinition queryDefinition, CancellationToken cancellationToken = default)
+{
+    var sql = SqlText.Vendor_ListQuery;
+    var query = await _dbHelper.CreateQueryBuilderAsync(sql);
+    return await query
+        .ListQuery(queryDefinition)
+        .ValidateWith<Vendor>()
+        .GetResultAsync<Vendor>(cancellationToken);
+}
+
+// Controller, 2-param HandleListRequestAsync<TDto, TModel>()
+[HttpPost("vendorFilter")]
+public async Task<ActionResult<ListResponse<VendorDto>>> ListPost(...)
+```
+
+The skill catalog now spans the obvious procedural ones (`api-patterns`, `datatables`, `ui-conversion`, `build`, `git-workflow`, `repo-docs`, `playwright`), a hyper-specific one born from a real bug (`military-time`, because the project is 24-hour end to end and Claude kept rendering 12-hour), and an entire `speckit-*` family that turns the Spec-Kit lifecycle into invocable steps. There's also `speckit-metadata`, a bridge skill I'll come back to.
+
+The split between agent and skill is the load-bearing design decision from Part 4 that I'd defend hardest today. Agents are always loaded and burn tokens every session. Skills page in on demand. So anything procedural, a code sample or a step-by-step, belongs in a skill. An agent that inlines a recipe is wasting always-on budget for content that should load only when needed. Keeping agents thin is about token economics, not tidiness.
+
+---
+
+## Tier 4: Rule Sheets, the Hints That Grew Teeth
+
+In Part 4, Tier 5 was `.cursor/rules/*.mdc`: three-bullet glob-scoped hints, "remind, never govern." That tier evolved into something more useful. It's now `.claude/rules/`, one one-page compliance sheet per principle, and they're indexed in a README that maps each sheet to the agent that enforces it and the skill that scaffolds it:
+
+| # | Principle | Rule sheet | Agent (enforces) | Level |
+|---|---|---|---|---|
+| I | WinForms Parity First | `01-winforms-parity.md` | `pr-review` | Standard |
+| V | Data Integrity & Audit | `05-data-integrity-…md` | `arch-reviewer` | NON-NEGOTIABLE |
+
+Each sheet is built for one job: catching drift in a diff, fast. They use an Allowed/Forbidden table and, the part I actually rely on, grep checks you can run before opening a PR. From `05-data-integrity-auditing.md`, the NON-NEGOTIABLE sheet:
+
+```bash
+# Insert SQL missing any of the four audit columns
+for f in $(find src -name "Create*.sql"); do
+  for col in CreateDateTime CreateUser ModifyDateTime ModifyUser; do
+    grep -q "$col" "$f" || echo "$f missing $col"
+  done
+done
+
+# Username instead of email for audit (should use GetAuditUsername)
+grep -rnE "EffectiveUserName|User\.Identity\?\.Name|Environment\.UserName" \
+  src/BargeOps.UI/Controllers src/BargeOps.API/src/Admin.Api/Controllers
+```
+
+That's the same audit rule again. Principle V in the constitution, a red flag in `service-author`, gate G7 in the review process, and now a shell one-liner a human or an agent can run in two seconds. The rule appears at four altitudes, and they don't contradict each other because they all trace back to one principle. That's the part that actually works.
+
+The Forbidden tables carry a discipline the cursor hints couldn't. Every entry is annotated with *why*, and the sheets are explicit that the entries aren't generic lint from training data. They're real drift observed in this repo. From the rules README:
+
+```markdown
+## What these sheets are not
+
+- Not a list of anti-patterns from training data. Every Forbidden entry comes from
+  a real drift observed in this repo.
+```
+
+The "remind, never govern" instinct is still there, since the sheets defer to the constitution on any conflict, but they're no longer just reminders. They're executable checklists.
+
+---
+
+## Tier 5: SpecKit, the Lifecycle That Runs the Whole Thing
+
+Here's the part that didn't fit in Part 4, because Part 4 was about structure and this is about motion. The governance isn't something you're supposed to remember to apply. It's a sequence of commands, and the constitution itself lists them in order:
+
+```markdown
+### Spec-Kit lifecycle
+
+1. /speckit.constitution      amend the constitution when a principle changes.
+2. /speckit.convert-specify   create spec.md from the legacy form (no security TBD).
+3. /speckit.clarify           resolve underspecified areas before planning.
+4. /speckit.plan              generate plan.md aligned with the 7 phases.
+5. /speckit.tasks             generate dependency-ordered tasks.md.
+6. /speckit.analyze           cross-artifact consistency check.
+7. /speckit.implement         execute tasks.
+8. /entity-audit              full entity audit when done.
+```
+
+Every entity conversion walks this path. The artifacts (`spec.md`, then `plan.md`, then `tasks.md`) are the parity evidence, the thing reviewers diff the new screen against to prove no legacy field was silently dropped. Code that shows up without them isn't reviewable, and `pr-review` flags it.
+
+This is where the `legacy-*` agents and the metadata bridge earn their keep. `/speckit.convert-specify` doesn't ask me to describe the old VB.NET form from memory. It dispatches the legacy analyzers, which pre-extract the form into structured JSON under `.speckit/entities/<Entity>/`. The `speckit-metadata` skill is the bridge that teaches every agent and scaffolder how to find and read that pack. Its file inventory is the clearest single illustration of how deep this goes: nine JSON files per legacy form, each owning one slice of truth.
+
+| File | Owns (authoritative for) | Consumed by |
+|---|---|---|
+| `data-access.frmX.json` | SP signatures, param types, SqlText entries | `repository-sql-specialist` |
+| `form-structure.frmX.json` | Legacy controls, grid column order, button palette | `display-attribute-sweeper` |
+| `validation.frmX.json` | FluentValidation class, DataAnnotations, jQuery | `service-author` |
+| `business-logic.frmX.json` | CSLA methods, cache-invalidation calls | `arch-reviewer` |
+| `security.frmX.json` | Legacy securityButtons → AuthPermissions mapping | `auth-policy-auditor` |
+
+Look at the right column. Every metadata file routes to a specific agent. The security extraction feeds `auth-policy-auditor`. The validation extraction feeds `service-author`. The data-access extraction feeds `repository-sql-specialist`. The legacy form gets shredded into exactly the inputs each specialist needs. That's the conversion pipeline the Part 4 governance model was quietly making possible. I just hadn't shown it.
+
+The bridge skill is also honest about reality in a way I appreciate every time I read it. Not every entity has a clean metadata pack. Some have several `frm*/` subfolders, some have a mismatched name, some have only an old Markdown spec, and several shipping entities have nothing at all:
+
+> Never hard-stop because metadata is absent. Several shipping entities (Boat, Commodity, Facility, Fleet, River, RiverArea, Vendor) have no pack today; blocking on their absence would refuse work on every one of them.
+
+That single line is what separates a governance system that survives from one that gets abandoned. The model degrades gracefully. Missing metadata is a WARN, not a wall.
+
+---
+
+## The Gate That Ties It Together
+
+There's one more artifact that makes the whole thing operational: `/audit-constitution`. It walks twelve gates (G1 through G12) against `git diff HEAD` and emits a finding per gate with a severity (BLOCK, WARN, or OK) and a one-line fix. It's the constitution's Code Review Gate, executable. The two NON-NEGOTIABLE gates can never be softened:
+
+```markdown
+- NON-NEGOTIABLE gates (G7, G8) are always BLOCK. They can never be downgraded to WARN,
+  even with a comment in the PR description.
+- A missing constitution.md is itself a BLOCK. Report it and stop (no other gate evaluates).
+- Do not paraphrase a gate. If a user-facing rule changes, update the constitution first;
+  this skill follows, it does not lead.
+```
+
+G7 is audit fields. G8 is transactions. Both trace to Principle V. The command ends each BLOCK by naming the agent that owns the fix (`arch-reviewer`, `auth-policy-auditor`, `display-attribute-sweeper`), so the report isn't just a complaint. It's a dispatch list. Constitution to gate to agent to fix, in one pass.
+
+---
+
+## What I'd Tell You to Steal
+
+If Part 4 was the theory, here's the part of the practice that actually mattered, ranked by how much grief it saved.
+
+**The one-rule-four-altitudes pattern is the core.** The audit-fields rule exists as a principle in the constitution, a red flag in an agent, a gate in the review command, and a grep check in a rule sheet. They never contradict because three of them are derivations of the first. When the rule changed from login name to email, the Sync Impact Report told me all four places to update. If you take one thing, take this: state each rule once at the top, and make every lower expression of it point back up.
+
+**Thin agents, fat skills.** Agents are always loaded. Every procedure you inline into an agent is rent you pay every session. Push recipes into on-demand skills and keep agents to scope plus routing.
+
+**Specialize the reviewers, but centralize the rules.** Eighteen narrow agents beat two broad ones, but only because the rule text lives in two corpora (`arch-reviewer` and `UI-Code-Review`) that everyone cites by ID. You get narrow enforcement with a single source of truth, and those two goals stop fighting once you separate the *who* from the *what*.
+
+**Make the governance a lifecycle, not a document.** The reason this didn't rot is that nobody has to remember to apply it. You run `/speckit.convert-specify`, the legacy agents mine the form, the scaffolders build to spec, `/audit-constitution` gates the diff, and `pr-review` routes the findings. The constitution isn't a thing you consult. It's the thing the pipeline executes.
+
+The Part 4 diagram was true. It was just clean. Three months of a real conversion turned five tidy tiers into a constitution with a blast-radius report, eighteen agents, a skill catalog, executable rule sheets, and a SpecKit lifecycle that mines legacy VB.NET into the inputs each specialist needs. Messier than the diagram, and also the only reason the diagram still holds.
+
+---
+
+*This is a follow-up to the AI Context Engineering for .NET Teams series. [Part 4, "Constitutional AI Context: How to Structure Rules That Don't Drift,"](/blog/constitutional-ai-context) gave the model; this post shows the production implementation. Doug is a .NET architect at CSG Solutions leading the BargeOps modernization, converting 195k+ lines of legacy VB.NET WinForms to ASP.NET Core using Claude Code's agent system. The infrastructure that makes running these agents across parallel sessions ergonomic is covered in [Claude Remote Agents: Running 10 AI Agents While You're Not at Your Desk](/blog/remote-developer-edge-tmux-tailscale).*
