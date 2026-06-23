@@ -8,7 +8,7 @@ seriesOrder: 7
 image: "/post-images/replaced-conversion-tool-native-subagents.png"
 ---
 
-In February I wrote about a 10-agent system that reads two-decade-old VB.NET WinForms and converts it to ASP.NET Core. That post ([Claude Remote Agents: Running 10 AI Agents While You're Not at Your Desk](/blog/remote-developer-edge-tmux-tailscale)) was mostly about the tmux plus Tailscale plus SSH setup that let me kick off a conversion and walk away. The star of it was a tool I'd built and open-sourced: the `claude-code-conversion-agent`, ten specialized TypeScript agents driven by a `bun run agents/orchestrator.ts` orchestrator that chewed through a legacy form and dropped JSON into an `output/` folder.
+In February I wrote about a 10-agent system that reads two-decade-old VB.NET WinForms and converts it to ASP.NET Core. That post ([Claude Remote Agents: Running 10 AI Agents While You're Not at Your Desk](/blog/remote-developer-edge-tmux-tailscale)) was mostly about the tmux plus Tailscale plus SSH setup that let me kick off a conversion and walk away. The star of it was a tool I'd built and open-sourced: the [`claude-code-conversion-agent`](https://github.com/DougRomano/claude-code-conversion-agent), ten specialized TypeScript agents driven by a `bun run agents/orchestrator.ts` orchestrator that chewed through a legacy form and dropped JSON into an `output/` folder.
 
 That tool worked. I used it on real entities. And I've since pulled it out of the workflow entirely.
 
