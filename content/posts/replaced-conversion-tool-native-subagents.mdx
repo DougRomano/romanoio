@@ -1,0 +1,260 @@
+---
+title: "I Replaced My Own Conversion Tool: Nine Native Subagents and One Command That Mine 20-Year-Old VB.NET"
+date: "2026-06-23"
+excerpt: "Back in February I shipped a standalone 10-agent TypeScript tool that read legacy WinForms and emitted conversion metadata. I just pulled it out of the workflow. Here's the in-repo pipeline that replaced it: nine native Claude Code subagents, a slash-command orchestrator that fans them out in waves, and the conversion commands that turn their output into a spec."
+tags: ["Claude Code", "AI", ".NET", "Agentic Development", "SpecKit", "VB.NET", "Legacy Migration", "Developer Productivity"]
+series: "AI Context Engineering for .NET Teams"
+seriesOrder: 7
+image: "/post-images/replaced-conversion-tool-native-subagents.png"
+---
+
+In February I wrote about a 10-agent system that reads two-decade-old VB.NET WinForms and converts it to ASP.NET Core. That post ([Claude Remote Agents: Running 10 AI Agents While You're Not at Your Desk](/blog/remote-developer-edge-tmux-tailscale)) was mostly about the tmux plus Tailscale plus SSH setup that let me kick off a conversion and walk away. The star of it was a tool I'd built and open-sourced: the `claude-code-conversion-agent`, ten specialized TypeScript agents driven by a `bun run agents/orchestrator.ts` orchestrator that chewed through a legacy form and dropped JSON into an `output/` folder.
+
+That tool worked. I used it on real entities. And I've since pulled it out of the workflow entirely.
+
+Not because it failed. Because keeping a separate TypeScript runtime, in a separate repo, in sync with a target architecture that changes every week turned into its own maintenance project. The orchestrator knew how to parse a CSLA business object, but it didn't live in the codebase it was converting, so it couldn't see the constitution, the rule sheets, or the canonical reference repositories that define what "correct" output even looks like anymore. Every time the BargeOps patterns moved, the standalone tool drifted.
+
+So the ten agents came home. They're now nine native Claude Code subagents living in `.claude/agents/legacy-*.md`, plus one slash-command orchestrator, plus the rest of the conversion commands that turn their output into a spec. The orchestrator command says it plainly in its own reference section:
+
+```markdown
+The 9 ported subagent system prompts (originally from the standalone
+ClaudeOnshoreConversionAgent): .claude/agents/legacy-*.md.
+```
+
+This post is the deep dive on that port. What each conversion agent extracts, how the orchestrator runs them, and how their output flows through the conversion commands into a branch you can actually review. Every path, filename, model, and code block below is pulled from the repo as it stands today.
+
+---
+
+## What got ported, and what became a command
+
+The old tool had ten agents. The tenth, the Conversion Template Generator, was the interactive one. It read the nine analysis files and generated DTOs, repositories, services, controllers, and views while you guided it. That step didn't become a subagent. It became a command pipeline (`/speckit.convert-specify` and the scaffolders), which I'll get to.
+
+The other nine, the ones that do pure extraction, became subagents. The phase numbers carried straight over, which makes the before-and-after easy to read:
+
+```markdown
+| Phase | Subagent                          | Model  | Extracts                                  |
+|   1   | legacy-form-structure-analyzer    | sonnet | controls, grids, buttons, validators      |
+|   2   | legacy-business-logic-extractor   | opus   | CSLA rules, audit fields, factory methods |
+|   3   | legacy-data-access-analyzer       | opus   | SP catalog, ListQuery fields, soft-delete |
+|   4   | legacy-security-extractor         | sonnet | SubSystem, ButtonType to AuthPermissions  |
+|   5   | legacy-ui-component-mapper        | sonnet | Infragistics to Bootstrap/Select2/DataTbl |
+|   6   | legacy-form-workflow-analyzer     | sonnet | mode state machine, navigation, refresh   |
+|   7   | legacy-detail-tab-analyzer        | sonnet | tabs, child grids, inline-edit panel      |
+|   8   | legacy-validation-extractor       | sonnet | AreFieldsValid, maxlengths, BrokenRules   |
+|   9   | legacy-related-entity-analyzer    | sonnet | 1:M / M:1 / M:M, cascade, FK-547 fallback |
+```
+
+Look at the model column, because that's the first thing the port bought me. In the old TypeScript orchestrator, every agent was the same call to the same model. As native subagents, each one declares its own model in frontmatter, and the two hardest extractions get the bigger brain:
+
+```bash
+$ grep -rn "^model:" .claude/agents/legacy-*.md
+legacy-business-logic-extractor.md:4:model: opus
+legacy-data-access-analyzer.md:4:model: opus
+legacy-form-structure-analyzer.md:4:model: sonnet
+legacy-security-extractor.md:4:model: sonnet
+...
+```
+
+Business logic and data access run on Opus because untangling CSLA business rules and a tangle of stored procedures is where a cheaper model quietly invents things. The other seven run on Sonnet, because extracting a control list or a button-to-permission map is grunt work that Sonnet does well and fast. That split is impossible to express cleanly when your orchestrator is a `for` loop in TypeScript. It's one line of YAML when the agent is native.
+
+---
+
+## Every agent shares the same shape
+
+Before the individual agents, the thing that makes nine of them composable: they all obey the same contract. The standalone tool had this too, but it was buried in TypeScript interfaces. As subagent prompts, the contract is right there at the top of each file, and it's identical across all nine.
+
+Every agent takes a structured input block. No prose, no "analyze this form for me," just labeled paths and scope:
+
+```
+INPUT FILES:
+  Form:      <absolute path to frm<Form>.vb>
+  Designer:  <absolute path to frm<Form>.Designer.vb>
+  Business object: <abs path>           (phases 2, 3, 8, 9)
+  form-structure JSON: <phase-1 output> (wave 3 phases only)
+  business-logic JSON: <phase-2 output> (wave 3 phases only)
+
+OUTPUT PATH: <abs path to ...json.tmp>
+ENTITY: <Entity>
+FORM_NAME: <frmFormName>
+SCOPE: search | detail | single
+```
+
+Every agent writes one JSON file to `OUTPUT PATH`, which is always a `.tmp` first. And every agent shares the same failure contract, which is the part I care about most for unattended runs:
+
+```markdown
+## Failure / blocked-input contract
+1. Do NOT ask clarifying questions.
+2. If a required INPUT FILE is unreachable, end with ANALYSIS_BLOCKED: plus a
+   single-line description and DO NOT write a partial JSON.
+```
+
+"Do NOT ask clarifying questions" is a deliberate choice. These agents run in waves, often in parallel, often while I'm in a meeting. An agent that stops to ask a question is an agent that hangs the whole entity. So the rule is binary: either you can reach your inputs and you produce a complete file, or you stop with a sentinel the orchestrator can detect. There is no partial output. A half-written `business-logic.json` is worse than none, because something downstream will trust it.
+
+Each agent also carries the same short list of "Universal Best Practices," which is how the constitution reaches into extraction:
+
+```markdown
+## Universal Best Practices
+- Private scratchpad: think step-by-step privately; do not reveal chain-of-thought.
+- Always use IdentityConstants.ApplicationScheme (not "Cookies").
+- Follow MVVM: ViewModels over ViewBag / ViewData.
+```
+
+That `IdentityConstants.ApplicationScheme` line is the same rule that shows up as a BLOCK gate in the constitution and a grep check in the rule sheets. It's baked into the legacy extractors so the metadata they emit already proposes the right auth scheme, before a single line of converted code exists. This is the payoff of bringing the agents in-house. They share the governance of the repo they're converting.
+
+---
+
+## The nine, up close
+
+The roster table tells you what each agent owns. A few of them are worth opening up, because they show how much real legacy archaeology is happening.
+
+**Phase 2, business logic (Opus).** This one reads a CSLA business object, the `*Location.vb` or `*Base.vb` file, and pulls out properties, audit fields, computed fields, the soft-delete flag, concurrency columns, factory methods, CRUD methods, and the business rules. The business rules are the hard part, and the agent is told to capture them verbatim:
+
+```markdown
+... extracts properties, audit fields, computed fields, soft-delete flag,
+concurrency columns, business rules (BrokenRules.Assert calls, verbatim messages),
+factory methods, CRUD methods, and relationships.
+```
+
+Those `BrokenRules.Assert` messages are twenty years of accumulated domain knowledge, often the only documentation that a rule exists at all. Capturing them verbatim, not paraphrased, is what lets the downstream validation agent map them to FluentValidation without losing the exact wording an operator has seen on that screen for a decade.
+
+**Phase 3, data access (Opus).** It reads the legacy List class and business object and extracts the stored-procedure catalog, parameter signatures, result columns, the ListQuery filterable and sortable fields, and the soft-delete pattern. What makes it more than a parser is that it emits its output already shaped for the target architecture, not the legacy one:
+
+```markdown
+... Emits data-access.<frm>.json matching the BargeOps.Admin.Mono target
+architecture (embedded SQL under DataAccess/Sql/<Entity>/, SqlText.Get(...)
+accessors, IDbHelper, _SetActive.sql instead of _Delete.sql). Consumed by
+/scaffold-sql-repo and /speckit.convert-specify.
+```
+
+That last detail, `_SetActive.sql instead of _Delete.sql`, is the soft-delete principle from the constitution reaching all the way back into how legacy SQL gets re-expressed. The agent isn't describing the old system. It's writing the blueprint for the new one.
+
+**Phase 4, security (Sonnet).** It finds the `SubSystem`, the `SecurityButtons.Add(ButtonType.X, btnX)` initializations, and the `HasPermission(...)` checks, then maps each legacy `ButtonType` to a concrete `AuthPermissions.{Feature}Management` plus `PermissionAccessType` pair. It also reads phase 2's output to decide whether a Delete button maps to `Modify` (soft delete) or `FullControl` (hard delete). That cross-reference is the whole reason these agents run in a particular order, which brings us to the orchestrator.
+
+**Phase 5, UI mapping (Sonnet).** It maps every Infragistics control (`UltraGrid`, `UltraComboEditor`, `UltraDateTimeEditor`, and the rest) to a modern Bootstrap 5, Select2, DataTables, or split-DateTime equivalent. It carries one rule that's pure product opinion rather than mechanical translation:
+
+```markdown
+When the form scope is search, controlMappings MUST include a v2 Export toolbar
+entry (#btnExport / DataTables CSV trigger) even if legacy had no Export.
+```
+
+The legacy WinForms screens mostly had no export button. The new standard says every search screen gets one. So the extractor proposes the Export control that never existed in the source, because parity with the design system beats parity with a twenty-year-old form. That's a judgment call encoded into an extraction agent.
+
+**Phase 8, validation (Sonnet).** This is the dedupe specialist. The same rule often lives in two places in the legacy code: a form-level `AreFieldsValid` check and a business-object `BrokenRules.Assert`. The agent reads both phase-1 and phase-2 output and is explicit about catching the overlap:
+
+```markdown
+Many rules exist in both places. Capture both sourceLocations so the consumer
+can dedupe.
+```
+
+It also tags each rule with a client-or-server `enforcement` and an `applicability` (always versus conditional, plus the predicate), so the converted code knows whether a rule becomes a jQuery validator, a FluentValidation rule, or both.
+
+Phases 1, 6, 7, and 9 round it out: the form-structure analyzer that everything else cross-references, the workflow analyzer that reconstructs the Add/Edit/View/Search state machine and its visible/enabled/readonly matrix, the tab analyzer that handles detail forms and the inline-edit panel pattern, and the related-entity analyzer that maps the relationship graph and decides where an FK-547 soft-delete fallback is needed.
+
+---
+
+## The orchestrator: one command, three waves
+
+In the old world, orchestration was `bun run agents/orchestrator.ts --entity "Facility"`. In the new world it's a slash command, `/speckit.specify-onshore`, and it does considerably more than a `for` loop over ten agents. Its execution flow is eleven documented steps. The interesting ones are worth walking.
+
+It starts by reading config, because legacy naming is a swamp. A committed `.speckit/onshore-config.json` maps the messy real-world stems:
+
+```json
+"entityFormStems": {
+  "BargeExConfigs": "frmBargeEx",
+  "BargeEventTypes": "frmEventTypes",
+  "BoatFuel": "frmBoatFuelPrices"
+}
+```
+
+`BargeExConfigs` doesn't live in `frmBargeExConfigs.vb`. It lives in `frmBargeEx.vb`. The standalone tool handled this with hardcoded special cases. The command handles it with config you can override locally, and a six-step form probe that tries the explicit flags, then the Search/Detail pair, then the bare-search shape, then the single SearchAndEdit form, then the config map, and finally a glob. The first match wins. Only the glob fallback is allowed to ask the user anything.
+
+Then it decides which phases to run, and this is new: not every form runs all nine agents. Ownership is by scope.
+
+```markdown
+- SCOPE: search → phases 1, 2, 3, 4, 5, 6, 8, 9 (eight files; no tabs.json).
+- SCOPE: detail → phases 1, 7 only (form-structure-detail + tabs).
+- SCOPE: single → all 9 phases.
+```
+
+A detail form doesn't need a security extraction or a data-access blueprint, because its search sibling already owns those. It needs its structure and its tabs. So it runs two agents, not nine. The old orchestrator ran the full sequence every time.
+
+The sequencing itself is the biggest upgrade. The standalone tool ran agents 1 through 10 strictly in order, one after another, which is why a full entity "can take a meaningful chunk of time," as I put it back in February. The command runs them in three waves, and two of those waves are parallel:
+
+```markdown
+Wave 1 (sequential):   phase 1 (form-structure)
+Wave 2 (parallel):     phases 2 (business-logic) + 3 (data-access)
+Wave 3 (parallel):     phases 4, 5, 6, 7, 8, 9
+```
+
+Wave 1 runs alone because everything cross-references it. Wave 2 runs the two Opus agents side by side. Wave 3 fans out the remaining six at once, each handed the absolute paths to the wave-1 and wave-2 JSON it depends on. Six agents reading two shared files and writing six independent ones is exactly the kind of work that parallelizes cleanly, and native subagents make it a `Agent`-tool fan-out instead of a runtime scheduling problem.
+
+Every write is crash-safe by construction. An agent writes to `file.json.tmp`. The orchestrator then verifies the result before it trusts it:
+
+```markdown
+After each subagent returns, the orchestrator MUST verify:
+1. The output file exists at the expected .json.tmp path.
+2. The .tmp file parses as JSON and has size > 0.
+3. The required top-level keys are present.
+4. The agent's final response did NOT end with ANALYSIS_BLOCKED:.
+... If verification passes, atomically rename .tmp to .json. If it fails,
+leave the previous .json untouched and record the failure.
+```
+
+A file that parses but comes back as `{}` is treated as failed. A mid-write crash leaves the previous good JSON in place, because the rename only happens on success. And the whole run is idempotent: on a re-run, any phase whose JSON already exists, parses, and has the required keys is skipped, unless you pass `--force`. State lives in `conversion-status.json` so you can resume a half-finished entity instead of starting over. None of this existed in the throwaway-`output/`-folder model.
+
+When it's done, it does not barrel ahead into generation. It prints a status tree and a single next-step hint, and stops:
+
+```markdown
+> Metadata pack written to .speckit/entities/Calendar/.
+> Next: /speckit.convert-specify Calendar
+
+Do NOT auto-invoke /speckit.convert-specify. The user moves to the next step
+deliberately, mirroring the rest of the speckit pipeline.
+```
+
+---
+
+## From metadata pack to reviewable branch
+
+Extraction is phase zero. The conversion process is the commands that consume the pack, and they're wired together with explicit handoffs in their frontmatter so the pipeline is discoverable from inside the tool:
+
+```markdown
+handoffs:
+  - label: Build Conversion Spec
+    agent: speckit.convert-specify
+  - label: Clarify Spec Requirements
+    agent: speckit.clarify
+```
+
+`/speckit.convert-specify` is the bridge from "nine JSON files" to "a spec on a branch a human can review." It does one thing the extraction never does: it always creates a new git branch and a new spec directory, every single time, by running a `create-new-feature` script that surveys remote branches, local branches, and the `specs/` folder for the highest existing number and bumps it. The user-facing contract is literally "I always get a new branch." That guarantee is worth more than it sounds. It means a conversion can never quietly overwrite the last one.
+
+Then it builds a complete form inventory by merging three sources: the analysis Markdown, the form-structure JSON directories, and any master plan. The rule it enforces while merging is the parity rule from the constitution, stated operationally:
+
+```markdown
+Gap check: If analysis .md lists forms not in form-structure JSON (or vice versa),
+include both. Never drop a form; reconcile by including all.
+```
+
+"Never drop a form" is the entire WinForms-parity principle compressed into a merge instruction. A child modal that shows up in the master plan but not the metadata pack doesn't get silently lost. It gets flagged and carried forward, because a dropped form is a dropped feature, and operators notice dropped features.
+
+From there the rest of the SpecKit lifecycle takes over, the same one I walked through in [the last post](/blog/constitution-in-production): `/speckit.clarify` resolves anything underspecified, `/speckit.plan` orders the seven implementation phases, `/speckit.tasks` produces the dependency-ordered task list, `/speckit.analyze` checks the artifacts against each other, `/speckit.implement` executes, and `/entity-audit` does the full-stack pass when it's done. The legacy agents fill the top of that funnel. The commands carry it the rest of the way.
+
+---
+
+## What the port actually bought
+
+If you're sitting on a standalone agentic tool and wondering whether to fold it into the repo it operates on, here's what moving these nine agents in-house actually changed, ranked by how much it mattered.
+
+Governance co-location came first. The extractors now share the constitution, the rule sheets, and the canonical reference repositories of the codebase they convert. When the auth-scheme rule or the soft-delete pattern changes, the agents see it, because they live in the same `.claude/` tree as the rule that defines it. The standalone tool couldn't, and it drifted every time the target moved.
+
+Model-per-phase came second. Opus on the two extractions where a cheap model hallucinates, Sonnet on the seven where it doesn't. That's a cost-and-accuracy dial that's one line of frontmatter per agent and was effectively unreachable inside a single TypeScript orchestrator call.
+
+Real parallelism came third. Three waves instead of a ten-step sequence, with the heavy middle and the wide tail both running concurrently. The native `Agent` tool does the fan-out, so I'm not scheduling anything.
+
+And the boring operational stuff, the part nobody puts in a launch post, came fourth and mattered more than I expected: tmp-write-then-atomic-rename, per-phase verification with required-key checks, `ANALYSIS_BLOCKED` instead of partial files, idempotent re-runs, and resumable status tracking. The February version wrote a flat `output/` folder and hoped. The current version treats every phase like a transaction.
+
+I open-sourced the standalone tool and I'm glad I built it, because it taught me what the nine extractions needed to be. But the version that's actually converting BargeOps today isn't a separate program I run against the codebase. It's nine subagents and a command that live inside it, governed by the same constitution as everything else they touch. That's the difference between a tool you maintain and a pipeline the repo just has.
+
+---
+
+*This is Part 7 of the AI Context Engineering for .NET Teams series. The standalone tool it replaces is described in [Claude Remote Agents: Running 10 AI Agents While You're Not at Your Desk](/blog/remote-developer-edge-tmux-tailscale), and the governance system these agents now share is the subject of [The Constitution in Production](/blog/constitution-in-production). Doug is a .NET architect at CSG Solutions leading the BargeOps modernization, converting 195k+ lines of legacy VB.NET WinForms to ASP.NET Core using Claude Code's agent system.*
