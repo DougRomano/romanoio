@@ -1,0 +1,101 @@
+---
+title: "Microsoft Modernized a WinForms Line-of-Business App on Stage. I've Spent Nine Months Doing It for Real. Here's What They Got Right and What They Skipped."
+date: "2026-06-23"
+excerpt: "On June 16, Microsoft's .NET Day on Agentic Modernization put a real-world WinForms line-of-business app on stage and modernized it live with Copilot, Aspire, and Foundry. It's almost exactly the system I've spent nine months converting. Here's the practitioner read: where the demo is right, and where it skips the parts that actually take the time."
+tags: ["AI", "Agentic Development", ".NET", "Modernization", "WinForms", "Software Architecture"]
+image: "/post-images/microsoft-agentic-modernization-what-they-got-right.png"
+---
+
+On June 16, Microsoft ran [.NET Day on Agentic Modernization](https://devblogs.microsoft.com/dotnet/join-us-for-dotnet-day-on-agentic-modernization-livestream/) on Reactor. Four hours of livestreamed sessions on modernizing legacy .NET apps with AI instead of rewriting them by hand. GitHub Copilot app modernization in Visual Studio. The Copilot Modernize CLI. David Pine pointing Aspire at a legacy app live. Microsoft Foundry for post-migration AI. And sitting right in the middle of the agenda, a session on migrating real-world WinForms and data-heavy line-of-business apps.
+
+I watched the whole thing because I'm doing this exact work right now.
+
+For the last nine months I've been leading the conversion of a 195,000-line VB.NET WinForms line-of-business app, sitting on a SQL Server backend that's been in production for over fifteen years, into a modern ASP.NET Core architecture with Dapper repositories and a Bootstrap front end. Not in a demo. In production, for a real client, with real users who notice immediately when a screen behaves differently than it did last week.
+
+So when Microsoft put my exact category of system on stage and modernized it live, I paid close attention. Here's the read from nine months on this specific problem: what they got right, and what the demo quietly skipped.
+
+## What They Got Right
+
+Microsoft earned a lot of credit here, so let me start there.
+
+**The framing is correct.** "Modernize without the rewrite" is the right message for the enterprise .NET audience. Most teams sitting on a legacy line-of-business app are not going to get budget for a ground-up rewrite, and they shouldn't. Treating modernization as a guided, incremental, tool-assisted process rather than a big-bang rewrite is the right call. 
+
+**The Copilot Modernize CLI is the part worth paying attention to.** Agentic, end-to-end modernization you can run on a single app or batch across many repositories in parallel, with CI/CD pipeline integration so modernization becomes a repeatable build step. That's a strong idea. The runtime-upgrade path, getting an app off old .NET Framework, updating dependencies, getting it Azure-ready, provisioning infrastructure, and deploying to App Service, is real, mechanical, error-prone work that AI is genuinely good at. If your job is "lift this .NET Framework app onto modern .NET and into Azure," these tools will save you weeks.
+
+**Custom skills to encode your org's patterns.** The Modernize CLI lets you bake your organization's migration patterns, internal libraries, and coding standards into every run. I'll come back to this, because it's the most important thing they showed, and not for the reason they think.
+
+**The Aspire onboarding flow is genuinely clever.** `aspire init` and the "Aspireify" agent skill to add orchestration and observability to an existing app, instead of hand-rolling a weekend of YAML and OpenTelemetry wiring. That's a real pain point, gone.
+
+**Post-migration AI with Foundry was the most grounded part of the day.** Bruno Capuano's session, "OK, you migrated your app, now what?", was practical and honest. Analyze your logs, extract insights, generate smarter reports, expose the modernized app to agents via built-in MCP. Just practical value layered onto a system that already works.
+
+None of that is overstated. If you only take the Microsoft tooling away from this post, you'll be better off than you were.
+
+But.
+
+## Where the Demo Skips the Hard Parts
+
+A livestream demo is optimized to show the part that works in twelve minutes. The parts that take nine months don't fit in the format. And those are the parts that actually determine whether your modernization succeeds.
+
+### 1. "Upgrade" and "re-platform" are two completely different jobs
+
+The biggest trick in the whole space, not just Microsoft's, is collapsing two fundamentally different problems into one word: *modernization.*
+
+Upgrading a .NET Framework app to modern .NET is a **runtime** modernization. The architecture stays the same. An MVC web app stays an MVC web app. A WinForms app can even stay a WinForms app, just running on .NET 9 instead of Framework 4.x. This is what the Copilot Modernize CLI is genuinely great at.
+
+Converting a VB.NET WinForms desktop app into an ASP.NET Core web application is an **architectural** re-platform. The UI layer doesn't exist anymore. The event-driven desktop model gets replaced by a request/response web model. The data access has to be rebuilt. That is not an upgrade. That is a rewrite. A *disciplined, AI-assisted, incremental* rewrite, but a rewrite.
+
+The demo blurs these. The audience hears "modernize WinForms" and pictures their desktop LOB app becoming a web app over a long weekend. It won't. And pretending otherwise sets teams up to discover the real scope three sprints in, after they've already told leadership it was handled.
+
+### 2. Business-rule extraction is the actual project
+
+In a twenty-year-old line-of-business app, the business rules aren't in a tidy domain layer. They're smeared across button-click handlers, embedded in factory methods, hiding in form-load events, duplicated across three screens with subtle differences nobody documented. Extracting them faithfully, *every* rule, including the one that only fires on the third Tuesday of the quarter because a customer demanded it in 2011, is the genuinely hard part of any LOB conversion.
+
+A runtime upgrade tool doesn't have to understand your business rules. It's preserving behavior by preserving code. A re-platform tool *must* understand them, because it's re-expressing that behavior in a completely different structure.
+
+This is why my system has a dedicated Business Logic Extractor agent whose entire job is to mine rules, validation, and factory methods out of the legacy business objects and emit them as structured JSON that the rest of the pipeline can reason over. Not a summary. Not a vibe. A machine-readable map of what the app actually does. That agent exists precisely because no general-purpose modernizer reliably solves this, and I needed it solved the same way a hundred times.
+
+### 3. Data access doesn't migrate itself
+
+The WinForms app I'm converting talks to SQL Server through a wall of stored procedures, each with its own parameter conventions, output patterns, and accumulated edge cases. "Make it Azure-ready and deploy it" doesn't touch any of that. Getting from a legacy data-access layer to clean Dapper repositories, with parameter fidelity, correct null handling, and the same result shapes the UI expects, is painstaking, high-stakes work. Get a parameter wrong and you don't get a compile error. You get a silently wrong number on someone's financial report.
+
+My Data Access Pattern Analyzer agent exists for exactly this reason: catalog the stored procedures, capture the parameters, map the patterns, and feed that into the repository generation. It's not a twelve-minute demo. It's the difference between a conversion that works and one that lies to your users.
+
+### 4. Nobody on stage talked about the test coverage you don't have
+
+Here's the uncomfortable part of legacy LOB apps: most of them have essentially zero automated tests. So when an agent confidently rewrites a screen, what exactly is verifying that the new version does what the old one did?
+
+You cannot trust an agentic conversion of a system you can't test. The first real work on any of my entity conversions isn't generating the new code. It's establishing enough of a characterization safety net to *know* the behavior was preserved. "Modernize in minutes" demos almost never show this step, because building the safety net for a system that never had one is slow, and slow doesn't livestream well. But skip it and you're not modernizing. You're gambling with someone else's production data.
+
+### 5. Third-party controls are half the WinForms problem
+
+Real WinForms LOB apps aren't built on stock controls. They're built on Infragistics, DevExpress, Telerik, grids and combos and editors with twenty years of configuration baked in. Converting an `UltraGrid` to a modern DataTables setup, or an `UltraCombo` to Select2, with the sorting, filtering, formatting, and event behavior the users rely on, is a substantial chunk of the actual work. I have a UI Component Mapper agent dedicated to this single translation problem. I have never once seen it addressed honestly in a modernization demo.
+
+### 6. "Minutes" versus "days"
+
+The phrase in the agenda was "add agentic functionality in minutes." For the *add AI to an already-modernized app* scenario, fair enough. But for the conversion itself? My honest, hard-won number is this: entities that used to take a developer **weeks** of manual analysis and rewriting now take **days** with my agent pipeline. That's a massive win. It is also not "minutes," and it is not a livestream. Anyone who tells you a real WinForms LOB conversion happens in minutes is describing the demo, not the project.
+
+## The Most Important Thing They Showed Was an Accident
+
+Remember the Modernize CLI feature for baking your org's patterns, libraries, and standards into every run? That's the headline, and Microsoft didn't frame it as one.
+
+Because that's the whole thing.
+
+What separates people *experimenting* with AI modernization from people *engineering* with it is exactly that: encoding your specific patterns, your specific architecture, and your specific standards so the agent produces *your* output, not generic output. I've been doing this with a config repo full of `CLAUDE.md` files, agent definitions, custom skills, and a `WORKFLOW.md` that documents the whole multi-phase pipeline. Treated as code, version-controlled, reviewed, the same SDLC as the platform itself.
+
+When Microsoft ships "custom skills to encode your migration patterns," they are validating the pattern that practitioners doing this work already converged on independently. That's not a threat to the approach. That's the industry catching up to it. The teams that do well over the next two years won't be the ones who adopted a tool fastest. They'll be the ones who invested in encoding their own knowledge so the tools produce something worth shipping.
+
+## What I'd Tell a Team Starting Monday
+
+Here's the practical synthesis, because this isn't a takedown. It's a map.
+
+**Use Microsoft's tools for what they're genuinely great at.** If your job is a runtime upgrade, get off old .NET Framework, modernize dependencies, get Azure-ready, deploy, reach for the Copilot Modernize CLI and the Visual Studio modernization flow. Use Aspire to add orchestration and observability. Use Foundry to layer AI onto the result. These will save you real time and there's no reason to hand-roll them.
+
+**But know which problem you actually have.** If you're re-platforming a desktop LOB app to the web, you are not doing an upgrade. You're doing an architectural conversion, and the hard parts, business-rule extraction, data-access fidelity, characterization tests, third-party control translation, are not solved by a general-purpose modernizer. They're solved by a purpose-built, orchestrated pipeline with a human making the architectural calls, structured artifacts flowing between specialized agents, and a spec driving the decisions.
+
+**And whatever you do, encode your patterns.** The single highest-leverage thing in this space is making the tools produce *your* architecture instead of a plausible average of everyone's. Microsoft built a feature for it. I built a repo for it. Build yours, however you build it.
+
+The livestream got the direction right. It just didn't have four hours for the part that takes nine months.
+
+---
+
+*Doug is a .NET architect at CSG Solutions leading the BargeOps modernization project, converting 195k+ lines of legacy VB.NET WinForms to ASP.NET Core using Claude Code's agent system. He writes about AI-assisted development, context management, and enterprise modernization patterns.*
