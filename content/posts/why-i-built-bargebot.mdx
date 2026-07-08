@@ -1,0 +1,77 @@
+---
+title: "I Bolted a Chatbot Onto a Live Billing System. Here's Why."
+date: "2026-07-08"
+excerpt: "A trade show gave me a deadline. A live enterprise .NET billing system gave me the constraints. This is the start of a five-part series on building BargeBot, a natural-language assistant over real operational data, and what it actually takes to ship one into production."
+tags: ["AI", "Agentic Development", ".NET", "OpenAI", "Function Calling", "ASP.NET", "Software Architecture"]
+series: "Building a Production Chatbot in .NET"
+seriesOrder: 1
+image: "/post-images/why-i-built-bargebot.png"
+---
+
+Most chatbot tutorials start with a blank repo and a clever prompt. Mine started with a deadline and a production billing system that people depend on every day.
+
+The system is BargeOps, the ASP.NET Core platform my team runs for inland marine liquid transportation. Operations, billing, and sales all live in it. Someone wants to know which barges are sitting idle right now. So they open the logistics dashboard, set a filter, scan a grid. Someone in billing wants to know what trips are ready to invoice for a specific customer. That's a different screen, a different filter, a different export. Someone in sales wants the contracts expiring in the next 30 days. Different screen again.
+
+None of that is hard. It's just *clicks*. Dozens of them a day, across a system with enough screens that even power users don't know every corner of it. The information was all there. It was just buried under navigation.
+
+So the question I kept coming back to was simple: what if you could just *ask*?
+
+## The trade show forced the issue
+
+I want to be honest about how this started, because the honest version is more useful than the tidy one.
+
+BargeBot didn't begin as a carefully planned platform initiative. It began because there was a trade show coming up, and a natural-language assistant over live operational data is an impressive thing to put in front of customers. That's a forcing function. A demo date is the most effective deadline in software because it doesn't move and everyone can see it.
+
+If you go back through the git history, the first commits are exactly what you'd expect from something built against a demo date. `BargeBotInit`. `MVP`. `Complete BargeBot MVP with testing and bug fixes`. Then, tellingly, `Retrain on live data`, `Query Optimization`, `Limit optimizations`. You can watch the thing wake up. It goes from "works in a demo" to "survives contact with real data" in the span of a few commits.
+
+I've written before about [the gap between what looks impressive in a two-minute clip and what actually works in a production .NET system](/blog/nine-months-in-the-trenches). BargeBot is the clearest example I have of that gap, because I built both versions. The trade-show version took days. The version that's safe to put in front of someone's financial data took months. This series is mostly about those months.
+
+## What BargeBot actually is
+
+Strip away the framing and here's the concrete thing.
+
+BargeBot is a chat interface inside BargeOps that lets a user ask a question in plain English and get an answer pulled from live operational data. "Which barges are idle right now?" "What's ready to bill for ABC Company?" "Where is barge BG-101?" "What contracts expire in the next 30 days?" "Can I generate a bill for trip 12345?"
+
+Under the hood it covers 34 query types across nine business domains: operations, billing, invoices, assets, boat orders, downtime, contracts, financial, and search. Each of those query types backs hundreds of natural phrasings, because "idle barges," "available barges," "what's free for assignment," and "show me barges sitting around" all need to land on the same answer.
+
+It remembers your conversation for a window so you can ask follow-ups. It respects role-based permissions, so a salesperson can't pull financial data they shouldn't see. It logs every query for audit. And when it doesn't know something, or when you ask it to do something it shouldn't, it's built to say so cleanly instead of guessing.
+
+That last paragraph is the whole game, by the way. Anybody can wire up the first version. The difference between a demo and a product is entirely in the second one.
+
+## The bet: don't rebuild anything
+
+Here's the architectural decision that made the rest of the project possible, and it's the one I'd most want another enterprise .NET developer to take away.
+
+I didn't build a new system. I wrapped the one I already had.
+
+The plan for the bot's capabilities was just as deliberate. We broke down the existing UI controller layer and gave the bot the same functionality users already had on screens. Every controller action that answered a question for a user was a candidate tool, so the controllers loosely mapped to the tools we were going to create. That meant the bot's feature list wasn't speculative. It was an inventory of what the application already did, translated into things you could ask for.
+
+BargeOps is five years old, and every one of those years is compounded business logic. Trip status workflows. Billing eligibility rules. Vendor rebill logic. Contract rate management. All of it living in a service layer that talks to SQL Server through Dapper, with a custom list-query library handling filtering, sorting, and pagination. Those services encode rules that have been validated against real money and real cargo every single day the system has been live. They are *correct* in the only way that counts: production has been beating on them and they hold.
+
+The temptation with an AI feature is to treat it as greenfield. New project, new patterns, maybe let the model write SQL directly against the database. I think that's a trap, and I'll spend a whole post in this series on why. The short version: the moment you let a language model generate SQL against your production schema, you've signed up to defend against every creative way it can get a query wrong, leak a column it shouldn't, or melt a table with an unbounded scan.
+
+Instead, BargeBot calls the *same services the rest of the application already calls*. When you ask for idle barges, it doesn't invent a query. It calls the exact code path the logistics dashboard uses. The AI's job isn't to know SQL. Its job is to figure out which of my existing, already-correct functions to call, and with what parameters. That's it.
+
+This is the part where .NET developers have an unfair advantage that nobody talks about. We've spent our careers building service layers, dependency injection, strongly-typed models, and authorization filters. An AI assistant built this way is mostly an *orchestration layer over infrastructure you already trust*. You're not building all of that from scratch. You're inheriting it.
+
+## What this series covers
+
+This is a five-part series, and I'm writing it as the build log I wish I'd had when I started. Not a hello-world tutorial, but the actual decisions, the things that bit me, and the parts no tutorial mentions.
+
+- **Part 1 (this post):** Why I built it, and the decision to wrap the existing system instead of replacing it.
+
+- **Part 2:** The architecture. The thin controller, the function-calling pipeline, and how the AI plugs into a Dapper service layer through dependency injection.
+
+- **Part 3:** Prompt engineering as software engineering. Why my prompts live in versioned files, and the single most important rule I gave the bot: *you are not a calculator.*
+
+- **Part 4:** Making it safe. Role-based authorization, write-intent refusal, financial-data scoping, and the messy QA cycle that turned a demo into something I'd trust with real data.
+
+- **Part 5:** Production realities. Caching, performance monitoring, conversation memory, rate limiting, the rebrand, and where this goes next.
+
+I built almost all of this with agentic workflows: Claude Code, SpecKit, the whole stack I've written about elsewhere. That mattered enormously, and it'll show up throughout. But the AI building the AI isn't the interesting part. The interesting part is that the engineering discipline didn't change. I still had to design the data flow, decide where the boundaries were, and review every line that touched a customer's money.
+
+A chatbot over your business data is one of the highest-leverage things you can build right now. It's also one of the easiest to build *badly*, in a way that doesn't show up until someone asks the wrong question at the wrong time.
+
+Let's get into how to build it well.
+
+*Next up, Part 2: The Architecture. Thin controller, fat pipeline, and why the AI never sees your database.*
