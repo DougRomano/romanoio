@@ -1,11 +1,11 @@
 ---
 title: "I Bolted a Chatbot Onto a Live Billing System. Here's Why."
 date: "2026-07-08"
-excerpt: "A trade show gave me a deadline. A live enterprise .NET billing system gave me the constraints. This is the start of a five-part series on building BargeBot, a natural-language assistant over real operational data, and what it actually takes to ship one into production."
+excerpt: "A trade show gave me a deadline. A live enterprise .NET billing system gave me the constraints. This is the start of a five-part series on building ChatBot, a natural-language assistant over real operational data, and what it actually takes to ship one into production."
 tags: ["AI", "Agentic Development", ".NET", "OpenAI", "Function Calling", "ASP.NET", "Software Architecture"]
 series: "Building a Production Chatbot in .NET"
 seriesOrder: 1
-image: "/post-images/why-i-built-bargebot.png"
+image: "/post-images/why-i-built-chatbot.png"
 ---
 
 Most chatbot tutorials start with a blank repo and a clever prompt. Mine started with a deadline and a production billing system that people depend on every day.
@@ -20,17 +20,17 @@ So the question I kept coming back to was simple: what if you could just *ask*?
 
 I want to be honest about how this started, because the honest version is more useful than the tidy one.
 
-BargeBot didn't begin as a carefully planned platform initiative. It began because there was a trade show coming up, and a natural-language assistant over live operational data is an impressive thing to put in front of customers. That's a forcing function. A demo date is the most effective deadline in software because it doesn't move and everyone can see it.
+ChatBot didn't begin as a carefully planned platform initiative. It began because there was a trade show coming up, and a natural-language assistant over live operational data is an impressive thing to put in front of customers. That's a forcing function. A demo date is the most effective deadline in software because it doesn't move and everyone can see it.
 
-If you go back through the git history, the first commits are exactly what you'd expect from something built against a demo date. `BargeBotInit`. `MVP`. `Complete BargeBot MVP with testing and bug fixes`. Then, tellingly, `Retrain on live data`, `Query Optimization`, `Limit optimizations`. You can watch the thing wake up. It goes from "works in a demo" to "survives contact with real data" in the span of a few commits.
+If you go back through the git history, the first commits are exactly what you'd expect from something built against a demo date. `ChatBotInit`. `MVP`. `Complete ChatBot MVP with testing and bug fixes`. Then, tellingly, `Retrain on live data`, `Query Optimization`, `Limit optimizations`. You can watch the thing wake up. It goes from "works in a demo" to "survives contact with real data" in the span of a few commits.
 
-I've written before about [the gap between what looks impressive in a two-minute clip and what actually works in a production .NET system](/blog/nine-months-in-the-trenches). BargeBot is the clearest example I have of that gap, because I built both versions. The trade-show version took days. The version that's safe to put in front of someone's financial data took months. This series is mostly about those months.
+I've written before about [the gap between what looks impressive in a two-minute clip and what actually works in a production .NET system](/blog/nine-months-in-the-trenches). ChatBot is the clearest example I have of that gap, because I built both versions. The trade-show version took days. The version that's safe to put in front of someone's financial data took months. This series is mostly about those months.
 
-## What BargeBot actually is
+## What ChatBot actually is
 
 Strip away the framing and here's the concrete thing.
 
-BargeBot is a chat interface inside BargeOps that lets a user ask a question in plain English and get an answer pulled from live operational data. "Which barges are idle right now?" "What's ready to bill for ABC Company?" "Where is barge BG-101?" "What contracts expire in the next 30 days?" "Can I generate a bill for trip 12345?"
+ChatBot is a chat interface inside BargeOps that lets a user ask a question in plain English and get an answer pulled from live operational data. "Which barges are idle right now?" "What's ready to bill for ABC Company?" "Where is barge BG-101?" "What contracts expire in the next 30 days?" "Can I generate a bill for trip 12345?"
 
 Under the hood it covers 34 query types across nine business domains: operations, billing, invoices, assets, boat orders, downtime, contracts, financial, and search. Each of those query types backs hundreds of natural phrasings, because "idle barges," "available barges," "what's free for assignment," and "show me barges sitting around" all need to land on the same answer.
 
@@ -50,7 +50,7 @@ BargeOps is five years old, and every one of those years is compounded business 
 
 The temptation with an AI feature is to treat it as greenfield. New project, new patterns, maybe let the model write SQL directly against the database. I think that's a trap, and I'll spend a whole post in this series on why. The short version: the moment you let a language model generate SQL against your production schema, you've signed up to defend against every creative way it can get a query wrong, leak a column it shouldn't, or melt a table with an unbounded scan.
 
-Instead, BargeBot calls the *same services the rest of the application already calls*. When you ask for idle barges, it doesn't invent a query. It calls the exact code path the logistics dashboard uses. The AI's job isn't to know SQL. Its job is to figure out which of my existing, already-correct functions to call, and with what parameters. That's it.
+Instead, ChatBot calls the *same services the rest of the application already calls*. When you ask for idle barges, it doesn't invent a query. It calls the exact code path the logistics dashboard uses. The AI's job isn't to know SQL. Its job is to figure out which of my existing, already-correct functions to call, and with what parameters. That's it.
 
 This is the part where .NET developers have an unfair advantage that nobody talks about. We've spent our careers building service layers, dependency injection, strongly-typed models, and authorization filters. An AI assistant built this way is mostly an *orchestration layer over infrastructure you already trust*. You're not building all of that from scratch. You're inheriting it.
 
