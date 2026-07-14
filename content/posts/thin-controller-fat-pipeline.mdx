@@ -24,7 +24,7 @@ User message
   -> ChatService (OpenAI function calling, 34 tool definitions)
   -> CachedQueryExecutor (per-query-type TTL caching)
   -> QueryExecutor (maps a query type to a domain service call)
-  -> Domain service (BillingService, BargeService, etc. Existing Dapper code.)
+  -> Domain service (BillingService, AssetService, etc. Existing Dapper code.)
   -> SQL Server
 ```
 
@@ -51,23 +51,23 @@ A timeout measured in minutes rather than milliseconds, because a request that r
 
 `ChatService` is where the AI lives. It owns the OpenAI integration, the conversation assembly, and, most importantly, the catalog of tools the model is allowed to call.
 
-This is the heart of the function-calling pattern, and it's worth being precise about how it works, because "function calling" gets thrown around loosely. You don't ask the model to answer the question. You give the model a menu of *functions it can request*, each described in a structured schema, and you let it choose. The model returns "call `get_idle_barges` with no parameters" or "call `search_trips` with `customerName: 'ABC Company', status: 'InProgress'`." Then **your** code runs that function. The model never touches your data. It just names the door it wants you to open. It also never sees anything a tool didn't return: the only things that leave the application are the user's question, the tool schemas, and the results my code chooses to send back. The database, the schema, and the connection strings stay home.
+This is the heart of the function-calling pattern, and it's worth being precise about how it works, because "function calling" gets thrown around loosely. You don't ask the model to answer the question. You give the model a menu of *functions it can request*, each described in a structured schema, and you let it choose. The model returns "call `get_idle_assets` with no parameters" or "call `search_trips` with `customerName: 'ABC Company', status: 'InProgress'`." Then **your** code runs that function. The model never touches your data. It just names the door it wants you to open. It also never sees anything a tool didn't return: the only things that leave the application are the user's question, the tool schemas, and the results my code chooses to send back. The database, the schema, and the connection strings stay home.
 
 Each tool is declared with a description and a typed parameter schema:
 
 ```csharp
 ChatTool.CreateFunctionTool(
-    functionName: "get_idle_barges",
-    functionDescription: "Returns barges that are currently idle and available for assignment. Requires no parameters.",
+    functionName: "get_idle_assets",
+    functionDescription: "Returns assets that are currently idle and available for assignment. Requires no parameters.",
     functionParameters: /* JSON schema describing the arguments */
 );
 ```
 
 I have more than thirty of these, and they didn't come out of a brainstorm. They came from breaking down the existing UI controller layer. The actions users already invoke from screens loosely mapped to the tools worth creating: if a controller action answered a question in the UI, the bot got a tool that answers the same question in chat. That kept the catalog grounded in functionality the business had already asked for and QA had already exercised.
 
-The function *names* are deliberately snake_case (`get_idle_barges`, `calculate_trip_margin`, `search_customer_invoices`). A small convention, but a useful one. It keeps the tool namespace visually distinct from my C# methods, which use PascalCase with an Async suffix. When I'm reading a prompt or a log, I can tell instantly whether I'm looking at something the model asked for or something my code did.
+The function *names* are deliberately snake_case (`get_idle_assets`, `calculate_trip_margin`, `search_customer_invoices`). A small convention, but a useful one. It keeps the tool namespace visually distinct from my C# methods, which use PascalCase with an Async suffix. When I'm reading a prompt or a log, I can tell instantly whether I'm looking at something the model asked for or something my code did.
 
-The quality of these tool descriptions matters more than almost anything else in the system. The description *is* the interface the model programs against. "Returns idle barges" versus "Returns barges that are currently idle and available for assignment, requires no parameters" is the difference between the model confidently calling the tool and the model stalling to ask the user a clarifying question it didn't need to ask. I tune these descriptions the way I'd tune an index: empirically, by watching what goes wrong.
+The quality of these tool descriptions matters more than almost anything else in the system. The description *is* the interface the model programs against. "Returns idle assets" versus "Returns assets that are currently idle and available for assignment, requires no parameters" is the difference between the model confidently calling the tool and the model stalling to ask the user a clarifying question it didn't need to ask. I tune these descriptions the way I'd tune an index: empirically, by watching what goes wrong.
 
 ## QueryExecutor: one switch, all the wiring
 
@@ -80,7 +80,7 @@ public async Task<QueryResult> ExecuteQueryAsync(string queryType, IDictionary<s
 {
     return queryType switch
     {
-        "get_idle_barges"       => await _bargeService.GetIdleBargesAsync(),
+        "get_idle_assets"       => await _assetService.GetIdleAssetsAsync(),
         "search_trips"          => await _tripService.SearchAsync(BuildTripRequest(args)),
         "calculate_trip_margin" => await _financialService.GetTripMarginAsync(args),
         // ... ~30 more
@@ -97,7 +97,7 @@ A switch statement may feel unfashionable next to a registry of handler classes 
 
 Sitting *between* `ChatService` and `QueryExecutor` is a decorator, and it's one of my favorite parts of the design because it's pure, classic .NET.
 
-`CachedQueryExecutor` implements the same `IQueryExecutor` interface as the real executor. It wraps the real one, checks a cache before delegating, and stores results on the way back out, with a time-to-live that varies per query type. Idle barges change constantly, so that's cached for seconds if at all. A contract's expiration date doesn't change minute to minute, so that can live longer. The TTLs are configured in `appsettings.json`, not hardcoded, so I can tune them without a deploy.
+`CachedQueryExecutor` implements the same `IQueryExecutor` interface as the real executor. It wraps the real one, checks a cache before delegating, and stores results on the way back out, with a time-to-live that varies per query type. Idle assets change constantly, so that's cached for seconds if at all. A contract's expiration date doesn't change minute to minute, so that can live longer. The TTLs are configured in `appsettings.json`, not hardcoded, so I can tune them without a deploy.
 
 ```csharp
 // Registered so the rest of the app depends only on the interface:

@@ -10,7 +10,7 @@ image: "/post-images/why-i-built-chatbot.png"
 
 Most chatbot tutorials start with a blank repo and a clever prompt. Mine started with a deadline and a production billing system that people depend on every day.
 
-The system is BargeOps, the ASP.NET Core platform my team runs for inland marine liquid transportation. Operations, billing, and sales all live in it. Someone wants to know which barges are sitting idle right now. So they open the logistics dashboard, set a filter, scan a grid. Someone in billing wants to know what trips are ready to invoice for a specific customer. That's a different screen, a different filter, a different export. Someone in sales wants the contracts expiring in the next 30 days. Different screen again.
+The system is BargeOps, the ASP.NET Core platform my team runs for inland marine liquid transportation. Operations, billing, and sales all live in it. Someone wants to know which assets are sitting idle right now. So they open the logistics dashboard, set a filter, scan a grid. Someone in billing wants to know what trips are ready to invoice for a specific customer. That's a different screen, a different filter, a different export. Someone in sales wants the contracts expiring in the next 30 days. Different screen again.
 
 None of that is hard. It's just *clicks*. Dozens of them a day, across a system with enough screens that even power users don't know every corner of it. The information was all there. It was just buried under navigation.
 
@@ -30,9 +30,9 @@ I've written before about [the gap between what looks impressive in a two-minute
 
 Strip away the framing and here's the concrete thing.
 
-ChatBot is a chat interface inside BargeOps that lets a user ask a question in plain English and get an answer pulled from live operational data. "Which barges are idle right now?" "What's ready to bill for ABC Company?" "Where is barge BG-101?" "What contracts expire in the next 30 days?" "Can I generate a bill for trip 12345?"
+ChatBot is a chat interface inside BargeOps that lets a user ask a question in plain English and get an answer pulled from live operational data. "Which assets are idle right now?" "What's ready to bill for ABC Company?" "Where is asset BG-101?" "What contracts expire in the next 30 days?" "Can I generate a bill for trip 12345?"
 
-Under the hood it covers 34 query types across nine business domains: operations, billing, invoices, assets, boat orders, downtime, contracts, financial, and search. Each of those query types backs hundreds of natural phrasings, because "idle barges," "available barges," "what's free for assignment," and "show me barges sitting around" all need to land on the same answer.
+Under the hood it covers 34 query types across nine business domains: operations, billing, invoices, assets, boat orders, downtime, contracts, financial, and search. Each of those query types backs hundreds of natural phrasings, because "idle assets," "available assets," "what's free for assignment," and "show me assets sitting around" all need to land on the same answer.
 
 It remembers your conversation for a window so you can ask follow-ups. It respects role-based permissions, so a salesperson can't pull financial data they shouldn't see. It logs every query for audit. And when it doesn't know something, or when you ask it to do something it shouldn't, it's built to say so cleanly instead of guessing.
 
@@ -50,7 +50,7 @@ BargeOps is five years old, and every one of those years is compounded business 
 
 The temptation with an AI feature is to treat it as greenfield. New project, new patterns, maybe let the model write SQL directly against the database. I think that's a trap, and I'll spend a whole post in this series on why. The short version: the moment you let a language model generate SQL against your production schema, you've signed up to defend against every creative way it can get a query wrong, leak a column it shouldn't, or melt a table with an unbounded scan.
 
-Instead, ChatBot calls the *same services the rest of the application already calls*. When you ask for idle barges, it doesn't invent a query. It calls the exact code path the logistics dashboard uses. The AI's job isn't to know SQL. Its job is to figure out which of my existing, already-correct functions to call, and with what parameters. That's it.
+Instead, ChatBot calls the *same services the rest of the application already calls*. When you ask for idle assets, it doesn't invent a query. It calls the exact code path the logistics dashboard uses. The AI's job isn't to know SQL. Its job is to figure out which of my existing, already-correct functions to call, and with what parameters. That's it.
 
 This is the part where .NET developers have an unfair advantage that nobody talks about. We've spent our careers building service layers, dependency injection, strongly-typed models, and authorization filters. An AI assistant built this way is mostly an *orchestration layer over infrastructure you already trust*. You're not building all of that from scratch. You're inheriting it.
 
