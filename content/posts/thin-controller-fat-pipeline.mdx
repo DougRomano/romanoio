@@ -1,0 +1,132 @@
+---
+title: "Thin Controller, Fat Pipeline: How I Wired a Chatbot Into a Dapper Service Layer"
+date: "2026-07-15"
+excerpt: "ChatBot never sees the database. It calls the same Dapper services the rest of the app calls. Here's the function-calling pipeline that makes that work: the thin controller, the tool definitions, the executor, and the caching decorator. And why this architecture is a gift to enterprise .NET developers."
+tags: ["AI", "Agentic Development", ".NET", "OpenAI", "Function Calling", "Dapper", "Software Architecture", "ASP.NET"]
+series: "Building a Production Chatbot in .NET"
+seriesOrder: 2
+image: "/post-images/thin-controller-fat-pipeline.png"
+---
+
+In [Part 1](/blog/why-i-built-chatbot) I said the central bet was to wrap the system I already had instead of building a new one. This post is about what that wrapping actually looks like in code.
+
+The mental model I want you to leave with is this: **the language model is a router, not a database client.** Its entire job is to read a user's plain-English question, decide which of my existing functions answers it, and fill in the parameters. Everything after that point is ordinary .NET. The same services, the same Dapper queries, the same authorization filters that the rest of the application has used for years.
+
+If you get that boundary right, the AI part of the system stays small and the trustworthy part stays large. If you get it wrong, you spend the rest of the project defending a language model's access to your production database. I chose the first one deliberately.
+
+## The flow, end to end
+
+Here's the path a message takes:
+
+```text
+User message
+  -> ChatController (api/chat/message)
+  -> ChatService (OpenAI function calling, 34 tool definitions)
+  -> CachedQueryExecutor (per-query-type TTL caching)
+  -> QueryExecutor (maps a query type to a domain service call)
+  -> Domain service (BillingService, BargeService, etc. Existing Dapper code.)
+  -> SQL Server
+```
+
+Every arrow is a boundary I can reason about, test, and lock down independently. Let's walk it.
+
+## The controller stays thin
+
+My standing rule across BargeOps is that controllers are thin. Under thirty lines per action, no business logic, no data access. ChatBot's controller honors that, even though it's doing something exotic.
+
+`ChatController` does exactly four things: validate that the message isn't empty, pull the authenticated user's identity, hand everything to `ChatService.ProcessMessageAsync`, and decorate the response with timing metadata for monitoring. That's it. The interesting work is one layer down.
+
+Two things on the controller are worth calling out, because they're easy to forget until production reminds you:
+
+```csharp
+[HttpPost("message")]
+[RequestTimeout(/* several minutes for long-running LLM/query work */)]
+[EnableRateLimiting("chatQueries")]  // hourly per-user cap
+public async Task<ActionResult<ChatResponse>> SendMessage([FromBody] ChatRequest request)
+```
+
+A timeout measured in minutes rather than milliseconds, because a request that round-trips to a model, calls a tool, and sometimes round-trips *again* is nothing like a normal MVC action that returns in 200ms. And a rate limit, because the cost and load profile of an LLM-backed endpoint is fundamentally different from anything else in your app. You do not want one user's runaway loop deciding your OpenAI bill for the month. More on both in Part 5. I just want you to see that they live at the very edge, on the controller, where they belong.
+
+## ChatService: the model as a router
+
+`ChatService` is where the AI lives. It owns the OpenAI integration, the conversation assembly, and, most importantly, the catalog of tools the model is allowed to call.
+
+This is the heart of the function-calling pattern, and it's worth being precise about how it works, because "function calling" gets thrown around loosely. You don't ask the model to answer the question. You give the model a menu of *functions it can request*, each described in a structured schema, and you let it choose. The model returns "call `get_idle_barges` with no parameters" or "call `search_trips` with `customerName: 'ABC Company', status: 'InProgress'`." Then **your** code runs that function. The model never touches your data. It just names the door it wants you to open. It also never sees anything a tool didn't return: the only things that leave the application are the user's question, the tool schemas, and the results my code chooses to send back. The database, the schema, and the connection strings stay home.
+
+Each tool is declared with a description and a typed parameter schema:
+
+```csharp
+ChatTool.CreateFunctionTool(
+    functionName: "get_idle_barges",
+    functionDescription: "Returns barges that are currently idle and available for assignment. Requires no parameters.",
+    functionParameters: /* JSON schema describing the arguments */
+);
+```
+
+I have more than thirty of these, and they didn't come out of a brainstorm. They came from breaking down the existing UI controller layer. The actions users already invoke from screens loosely mapped to the tools worth creating: if a controller action answered a question in the UI, the bot got a tool that answers the same question in chat. That kept the catalog grounded in functionality the business had already asked for and QA had already exercised.
+
+The function *names* are deliberately snake_case (`get_idle_barges`, `calculate_trip_margin`, `search_customer_invoices`). A small convention, but a useful one. It keeps the tool namespace visually distinct from my C# methods, which use PascalCase with an Async suffix. When I'm reading a prompt or a log, I can tell instantly whether I'm looking at something the model asked for or something my code did.
+
+The quality of these tool descriptions matters more than almost anything else in the system. The description *is* the interface the model programs against. "Returns idle barges" versus "Returns barges that are currently idle and available for assignment, requires no parameters" is the difference between the model confidently calling the tool and the model stalling to ask the user a clarifying question it didn't need to ask. I tune these descriptions the way I'd tune an index: empirically, by watching what goes wrong.
+
+## QueryExecutor: one switch, all the wiring
+
+When the model picks a tool, `ChatService` hands the request to the executor, and this is where the AI world reconnects to the boring, trustworthy .NET world.
+
+`QueryExecutor` is, at its core, a big switch statement that maps a query-type string to a concrete domain service call:
+
+```csharp
+public async Task<QueryResult> ExecuteQueryAsync(string queryType, IDictionary<string, object> args)
+{
+    return queryType switch
+    {
+        "get_idle_barges"       => await _bargeService.GetIdleBargesAsync(),
+        "search_trips"          => await _tripService.SearchAsync(BuildTripRequest(args)),
+        "calculate_trip_margin" => await _financialService.GetTripMarginAsync(args),
+        // ... ~30 more
+        _ => QueryResult.Unknown(queryType)
+    };
+}
+```
+
+There's nothing clever here, and that's the point. Every branch calls a service that already exists and was already correct. `search_trips` builds a `ListRequest` and calls the same trip search the grid uses. `calculate_trip_margin` calls the financial service that the reports use. The AI doesn't get a special, looser data path. It gets the same one everyone else gets, including the same parameter validation and the same authorization story (which gets its own post, Part 4).
+
+A switch statement may feel unfashionable next to a registry of handler classes or a mediator. I considered both. For thirty-odd query types maintained by a small team, the switch is the right call: it's greppable, it's debuggable, and a new engineer can read the entire surface of what the bot can do in one file. Adding a query type is a five-step recipe (define the tool in `ChatService`, implement the method, add the switch case, map its authorization, set its cache TTL), and four of those five steps are visible in two files. I'll take that over indirection.
+
+## CachedQueryExecutor: the decorator that saved me
+
+Sitting *between* `ChatService` and `QueryExecutor` is a decorator, and it's one of my favorite parts of the design because it's pure, classic .NET.
+
+`CachedQueryExecutor` implements the same `IQueryExecutor` interface as the real executor. It wraps the real one, checks a cache before delegating, and stores results on the way back out, with a time-to-live that varies per query type. Idle barges change constantly, so that's cached for seconds if at all. A contract's expiration date doesn't change minute to minute, so that can live longer. The TTLs are configured in `appsettings.json`, not hardcoded, so I can tune them without a deploy.
+
+```csharp
+// Registered so the rest of the app depends only on the interface:
+services.AddScoped<QueryExecutor>();
+services.AddScoped<IQueryExecutor>(sp =>
+    new CachedQueryExecutor(
+        sp.GetRequiredService<QueryExecutor>(),
+        sp.GetRequiredService<IMemoryCache>(),
+        sp.GetRequiredService<IConfiguration>()));
+```
+
+`ChatService` asks for `IQueryExecutor` and gets the cached one, never knowing or caring that caching exists. The day I needed to add caching, I didn't touch the executor or the chat service at all. I wrote a wrapper and changed one line of registration. That's the decorator pattern doing exactly what it's for, and it's the kind of thing a strongly-typed, DI-first framework makes almost free. A Python developer bolting caching onto an LLM pipeline is usually writing decorators by hand or reaching for a library. I got it from the same container I was already using for everything else.
+
+## Service lifetimes, because they bite
+
+One unglamorous detail that will absolutely cause you a bug if you ignore it: lifetimes.
+
+Most of my domain services are Transient. The chat-specific pieces are more deliberate. `ChatService`, `QueryExecutor`, and the cached executor are Scoped. One per request, which is correct because they carry per-request state and per-user identity. The conversation context manager and the performance monitor are effectively Singleton, because they hold state that has to live *across* requests: your conversation history, the rolling performance metrics.
+
+Get this wrong and the failure is nasty precisely because it's intermittent. Make the context manager scoped and conversation memory silently vanishes between messages. Make something singleton that holds a `DbConnection` and you'll get concurrency corruption under load that you'll never reproduce at your desk. None of this is AI-specific. It's the same dependency-injection discipline you already know. It just matters more here because the state is more interesting.
+
+## Why this shape is the right shape
+
+Step back and look at what the architecture buys you.
+
+The AI surface is tiny and contained: a set of tool definitions and the logic to interpret the model's choices. Everything underneath is code you already trust, reached through interfaces you already test. The boundary between "non-deterministic language model" and "deterministic business logic" is a single, sharp line: the executor. You can put authorization on one side of it, caching on the other, monitoring around the whole thing, and reason about each independently.
+
+That's the enterprise .NET advantage I keep coming back to. We didn't have to invent service layers, DI, typed models, and middleware for this project. We inherited decades of them. The chatbot is the thin, novel layer on top, and keeping it thin is what makes it safe.
+
+In the next post I'll get into the part that surprised me most: how much of this system's correctness lives not in the C# at all, but in a folder of plain-text prompt files I version like source code. Including the single rule that prevented an entire category of dangerous, confident, wrong answers.
+
+*Next up, Part 3: Prompt Engineering as Software Engineering. Why my prompts are versioned files, and why the most important thing I told the bot was "you are not a calculator."*
