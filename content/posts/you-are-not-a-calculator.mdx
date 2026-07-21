@@ -1,0 +1,105 @@
+---
+title: "You Are Not a Calculator: Prompt Engineering as Real Software Engineering"
+date: "2026-07-22"
+excerpt: "A third of ChatBot's correctness doesn't live in C# at all. It lives in ten versioned prompt files. Here's how I structured them, why prompts belong in source control, and the single rule that killed an entire category of confident, wrong, dangerous answers."
+tags: ["AI", "Agentic Development", ".NET", "Prompt Engineering", "OpenAI", "Software Architecture", "LLM"]
+series: "Building a Production Chatbot in .NET"
+seriesOrder: 3
+image: "/post-images/you-are-not-a-calculator.png"
+---
+
+In [Part 2](/blog/thin-controller-fat-pipeline) I walked through the pipeline that connects the language model to my Dapper services. That pipeline is deterministic. I can test it, trace it, and trust it.
+
+The model sitting on top of it is none of those things. It's a probabilistic system that will, given the chance, do something reasonable-looking and wrong. Most of the work of making ChatBot *safe*, as opposed to merely functional, happens in how I instruct that model. And here's the thing that took me too long to internalize: that instruction is not a "prompt" in the casual sense. It's a specification. It deserves the same engineering rigor as the code.
+
+## The prompt is a folder, not a string
+
+If you open the ChatBot source, you'll find a `Prompts/` directory with ten files:
+
+```text
+Prompts/
+  01-identity.txt
+  02-response-format.txt
+  03-currency-formatting.txt
+  04-domain-rules.txt
+  05-navigation-links.txt
+  06-financial-routing.txt
+  07-error-handling.txt
+  08-tool-guidelines.txt
+  09-failure-templates.txt
+  10-disambiguation.txt
+```
+
+These get composed into the system prompt at runtime. (The excerpts in this post are paraphrased rather than verbatim, but the structure and the rules are real.) The decomposition isn't cosmetic. It's the same instinct that makes you split a god-class into focused units. Each file has one job. `01-identity` establishes who the assistant is and what it covers. `03-currency-formatting` does nothing but specify how dollar amounts render. `09-failure-templates` is a 300-line rulebook for how to fail gracefully. When the bot mishandles currency, I know exactly which file to open. When it gets too eager to answer out-of-domain questions, that's a different file.
+
+I version these files in git, right next to the C#. They go through pull requests. They get reviewed. When something regresses, git blame tells me which prompt change caused it, the same way it would for a code change.
+
+I've made [this argument before in a broader context](/blog/constitutional-ai-context): your AI configuration is code, and the moment you treat it as a casual text file you edit and never review, you've left the most important part of your AI's behavior unmanaged. ChatBot is where that principle earned its keep. The behavior of this system is *defined* in these files as much as in the executor. Treating them as anything less than source would be malpractice.
+
+## The single most important rule: you are not a calculator
+
+Of everything in those ten files, one rule matters more than the rest. It lives in `06-financial-routing.txt`, and it reads, in part:
+
+> You are a strict data presenter, NOT a calculator. All numerical values come from BargeOps stored procedures. You must never produce a number that was not returned by a tool.
+
+This is the most important sentence in the entire project. Here's why.
+
+Language models are fluent. Fluency is exactly the problem when money is involved. If a user asks "what's the total outstanding balance across these five customers?", the model is happy to add up the five numbers it just displayed and hand you a sum. It will look perfect. It will be formatted beautifully. And it will be wrong often enough to be dangerous: a transposed digit, a dropped row, a rounding artifact, in a context where wrong numbers about who owes what is a bad outcome.
+
+The model doesn't know it's bad at arithmetic. It has no internal signal that says "this is the part I shouldn't trust myself on." So I drew the line for it, explicitly and aggressively:
+
+> **PROHIBITED. Never perform these on any data:** calculate, add, subtract, multiply, divide, percentage, average, sum, aggregate, compare numerically, rank by value, extrapolate, forecast, round, estimate, or derive any new number from tool results.
+
+Every number the user sees must have come *verbatim* from a stored procedure. The model may format it, label it, and explain what it means in business terms. It may not create one. If a margin needs computing, that computation happens in SQL, inside logic that's been validated against real billing for years. Never in the probabilistic layer.
+
+## Summarize versus compute: the line that's easy to blur
+
+The tricky part is that "don't calculate" can't mean "refuse anything numeric," or the bot becomes useless. Users legitimately want summaries. So the prompt draws a careful distinction:
+
+- "Summarize this trip's financials" is ALLOWED. Re-state the values returned by tools without computing new numbers.
+
+- "Sum up the margins across all trips" is REFUSED. It requires computing a new aggregate value.
+
+"Summarize Trip 1234's billing details" is fine. It re-states what a tool returned. "What's the average margin?" is refused, because there's no tool that returns *that* number, which means the model would have to invent it. The test is mechanical and the model can apply it reliably: *did a tool return this exact number, or would I be deriving it?* If deriving, refuse and redirect:
+
+> I can present the data returned by BargeOps, but I'm not able to perform calculations on it. For aggregations or custom analysis, use the **Export** feature or visit Financial Reports.
+
+That redirect is doing real work. It doesn't just decline. It points the user at the *correct* tool for what they actually want, which is a feature that already does the aggregation correctly. The failure becomes a navigation aid.
+
+If you take one idea from this entire series, make it this one: **find the category of answers your model must never improvise, and forbid the improvisation in the strongest possible language.** For a financial system, that category is "new numbers." For yours it might be medical dosages, legal conclusions, or inventory commitments. Name it and wall it off.
+
+## Failing well is a designed behavior
+
+The biggest tonal difference between the demo ChatBot and the production one is how it handles the questions it *can't* or *shouldn't* answer. In the demo, failure was an afterthought. In production, failure is a specification: `09-failure-templates.txt`, the largest prompt file I have.
+
+It defines explicit categories of failure, each with a trigger and a template response. Out-of-domain questions ("what's the weather in Memphis?") get a polite redirect to what the bot *can* do. Missing-parameter questions ("what's the margin?" with no trip specified) get a templated request for the specific missing piece, complete with examples. No-data, entity-not-found, voided-trip, truncated-results. Each has a defined, consistent response.
+
+And critically, the file specifies what happens when *multiple* failure categories fire at once, with an explicit priority order:
+
+> **Priority order**: write-intent refusal wins over data-manipulation refusal, which wins over missing parameters, too broad, and out of domain.
+
+So "update everything about all customers" trips both the write-operation guard and the too-broad guard, and the priority rule says the write refusal wins. Without that ordering, the model picks whichever it feels like, and your behavior becomes non-deterministic in a way QA can't pin down. With it, the behavior is specified. You can write a test for it. That single ordered list turned a class of "well, sometimes it does this" bugs into deterministic, testable behavior.
+
+There's a financial example I'm particularly fond of. When a trip's revenue comes back as $0.00, an unexplained zero is alarming. Without context, a bare zero looks like something's wrong. So the prompt forbids presenting a bare zero and instead requires an explanation keyed to the trip's status:
+
+> Revenue shows $0 because this trip is still in progress and has not been completed or billed yet. Revenue will appear once the trip is completed, approved, and invoiced.
+
+The number didn't change. The *trust* did. That's prompt engineering as UX.
+
+## Teaching it the business
+
+A chunk of the prompt is pure domain knowledge, because the model knows English but not *our* English. `04-domain-rules.txt` and `10-disambiguation.txt` exist because the same word means different things to ops, billing, and sales.
+
+"Approved" on a trip could mean approved-to-bill or a different approval step, so the bot is told to ask which. "Invoice number" could be the one we send the customer or the one a vendor sent us. A "fleet" or "group" is an operational logistics grouping, *not* a customer name, and the bot is explicitly instructed never to stuff a group name into the customer filter, because doing so silently returns wrong results that look right. These are the landmines that years of organizational vocabulary leave behind, and you can only defuse them by writing them down.
+
+There's also a subtle but important rule about context. When a user provides an explicit identifier, a trip ID or an invoice number, the bot treats it as self-scoping and *drops* any entity filters from earlier in the conversation. If we've been talking about the "Gulf Coast fleet" and you suddenly ask "what's the status of invoice 12345?", you want invoice 12345, not invoice 12345-if-it-belongs-to-Gulf-Coast. Conversation memory is a feature until it silently corrupts an explicit request. So the prompt says when to forget.
+
+## What I'd tell you to do
+
+If you're building something like this, resist the urge to keep your system prompt as one heroic string in a C# constant. Break it into files by concern. Put it in source control. Review changes to it like code, because they *are* code. They change your software's behavior more directly than most of your C# does.
+
+Then find your "you are not a calculator" rule. Every domain has one: the thing the model must never make up. Write it in the strongest language you can, give it permitted and prohibited examples, and pair every refusal with a redirect to the tool that does the job correctly.
+
+The prompts are where I spent my judgment. The next post is where I spent my paranoia: authorization, write-intent refusal, and the careful work of making sure a friendly chatbot can only ever reach the data a given user is already allowed to see.
+
+*Next up, Part 4: Making It Safe. Role-based authorization, financial-data scoping, write-intent refusal, and the QA cycle that turned a demo into something I'd trust with real data.*
