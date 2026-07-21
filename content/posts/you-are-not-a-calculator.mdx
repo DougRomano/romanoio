@@ -92,7 +92,7 @@ A chunk of the prompt is pure domain knowledge, because the model knows English 
 
 "Approved" on a trip could mean approved-to-bill or a different approval step, so the bot is told to ask which. "Invoice number" could be the one we send the customer or the one a vendor sent us. A "fleet" or "group" is an operational logistics grouping, *not* a customer name, and the bot is explicitly instructed never to stuff a group name into the customer filter, because doing so silently returns wrong results that look right. These are the landmines that years of organizational vocabulary leave behind, and you can only defuse them by writing them down.
 
-There's also a subtle but important rule about context. When a user provides an explicit identifier, a trip ID or an invoice number, the bot treats it as self-scoping and *drops* any entity filters from earlier in the conversation. If we've been talking about the "Gulf Coast fleet" and you suddenly ask "what's the status of invoice 12345?", you want invoice 12345, not invoice 12345-if-it-belongs-to-Gulf-Coast. Conversation memory is a feature until it silently corrupts an explicit request. So the prompt says when to forget.
+There's also a subtle but important rule about context. When a user provides an explicit identifier, a trip ID or an invoice number, the bot treats it as self-scoping and *drops* any entity filters from earlier in the conversation. If we've been talking about the "Northeast fleet" and you suddenly ask "what's the status of invoice 12345?", you want invoice 12345, not invoice 12345-if-it-belongs-to-East-Coast. Conversation memory is a feature until it silently corrupts an explicit request. So the prompt says when to forget.
 
 ## What I'd tell you to do
 
