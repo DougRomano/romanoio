@@ -1,7 +1,7 @@
 ---
 title: "You Can't Build a World Model on an Illegible System"
 date: "2026-07-27"
-excerpt: "Block's thesis rests on one sentence they drop almost in passing: everything they do creates artifacts. That's not an organizational choice — it's an architecture choice, and most enterprises made the opposite one fifteen years ago."
+excerpt: "Block's thesis rests on one sentence they drop almost in passing: everything they do creates artifacts. That's not an organizational choice; it's an architecture choice, and most enterprises made the opposite one fifteen years ago."
 tags: ["AI", "Agentic Development", "Software Architecture", "Spec-Driven Development", "Modernization", "Tech Leadership", ".NET"]
 image: "/post-images/illegible-system.png"
 ---
@@ -26,7 +26,7 @@ I think that's directionally right. I also think most companies attempting it ar
 
 ## The Precondition
 
-Here's the sentence. Block says everything they do creates artifacts. Decisions, discussions, code, designs, plans, problems, progress — all recorded, all machine-readable, because the company is remote-first and the work already lives in text.
+Here's the sentence. Block says everything they do creates artifacts. Decisions, discussions, code, designs, plans, problems, progress, all recorded, all machine-readable, because the company is remote-first and the work already lives in text.
 
 That's not an organizational choice. That's an architecture choice, and it happened before any of this was possible.
 
@@ -34,13 +34,13 @@ That's not an organizational choice. That's an architecture choice, and it happe
 
 - A critical business rule lives in a stored procedure written in 2014. Nobody knows it's there. The person who wrote it left in 2017.
 - The reason one table uses a soft delete and a closely related one uses a hard delete was decided in a Teams thread that scrolled off six months ago.
-- There are three definitions of a core metric — one in the reporting warehouse, one in a query on the dashboard, one in the export the finance team actually trusts.
+- There are three definitions of a core metric: one in the reporting warehouse, one in a query on the dashboard, one in the export the finance team actually trusts.
 - The requirements document describes a workflow the system stopped supporting two releases ago. Nobody updated it because nobody reads it.
 - Half your production behavior is emergent. It's what the code does, not what anyone decided it should do.
 
 Point an AI at that and it will build you a model. The model will be confidently wrong, because the source material is confidently wrong.
 
-Hierarchy is actually good at absorbing this. A senior engineer who has been on the team for six years *is* the world model. She knows the invoice rule is in the proc. She knows which "active user" number the CFO wants. That knowledge is undocumented, unversioned, single-threaded through one person, and it works — right up until she takes another job.
+Hierarchy is actually good at absorbing this. A senior engineer who has been on the team for six years *is* the world model. She knows the invoice rule is in the proc. She knows which "active user" number the CFO wants. That knowledge is undocumented, unversioned, single-threaded through one person, and it works, right up until she takes another job.
 
 Replacing her with a system means the system needs access to what she knows. Which means writing it down. Which means the boring work.
 
@@ -52,21 +52,21 @@ This is not a documentation initiative. Documentation initiatives fail because d
 
 That's the whole test. Everything below is a way of passing it.
 
-### Specs Before Code — and the Spec Has to Be Load-Bearing
+### Specs Before Code, and the Spec Has to Be Load-Bearing
 
 This is why we run spec-driven development, and why the specs live in a governed config repo instead of a folder called `/docs`.
 
-On the modernization work I'm leading, that repo is what we call **SpecKit**: a `WORKFLOW.md` that defines the sequence of operations, and a hierarchy of `CLAUDE.md` files that define the rules and non-negotiables at each level of the codebase. SpecKit governs a ten-agent conversion pipeline that reads a fifteen-year-old VB.NET WinForms application and produces the ASP.NET Core equivalent — DTOs, Dapper repositories, services, controllers, ViewModels, Razor views.
+On the modernization work I'm leading, that repo is what we call **SpecKit**: a `WORKFLOW.md` that defines the sequence of operations, and a hierarchy of `CLAUDE.md` files that define the rules and non-negotiables at each level of the codebase. SpecKit governs a ten-agent conversion pipeline that reads a fifteen-year-old VB.NET WinForms application and produces the ASP.NET Core equivalent: DTOs, Dapper repositories, services, controllers, ViewModels, Razor views.
 
 The important property isn't that any of it is written down. It's that it's **load-bearing**.
 
-Agent 2 extracts business rules out of event handlers and writes `business-logic.json`. Agent 3 traces stored procedure parameters and result shapes and writes `data-access.json`. Agent 5 maps the UI layer — UltraGrid to DataTables, UltraCombo to Select2 — and writes `ui-mapping.json`. The template generator cannot produce a repository without all of them.
+Agent 2 extracts business rules out of event handlers and writes `business-logic.json`. Agent 3 traces stored procedure parameters and result shapes and writes `data-access.json`. Agent 5 maps the UI layer (UltraGrid to DataTables, UltraCombo to Select2) and writes `ui-mapping.json`. The template generator cannot produce a repository without all of them.
 
 So when a spec drifts, nothing sits there quietly being wrong. The next agent consumes a stale artifact and the output is broken in a way that surfaces immediately: a filter condition that vanished, a validation rule that doesn't fire, a DTO that doesn't match what the procedure actually returns.
 
 That's the difference between a spec and a document. A document that drifts just sits there. **A spec that drifts breaks the build.**
 
-The same principle scales down to the `CLAUDE.md` hierarchy. Each file declares its place and points to the authoritative source for a given pattern. When four different files described the same query pattern, they drifted apart within weeks — not through carelessness, but because there was no single source and every edit was a coin flip about which copy got updated. One authoritative source per pattern, everything else a pointer, and drift stops being something you police. It becomes structurally impossible.
+The same principle scales down to the `CLAUDE.md` hierarchy. Each file declares its place and points to the authoritative source for a given pattern. When four different files described the same query pattern, they drifted apart within weeks, not through carelessness, but because there was no single source and every edit was a coin flip about which copy got updated. One authoritative source per pattern, everything else a pointer, and drift stops being something you police. It becomes structurally impossible.
 
 Here's the part I didn't expect. We didn't set out to build a legibility engine. We set out to convert a WinForms application. But that's what a conversion pipeline turns out to be: a machine that forces an illegible system to become legible, one entity at a time. The JSON artifacts *are* the world model of that application. Nine months in, the pipeline has written down things about that codebase that no living person ever had.
 
@@ -111,7 +111,7 @@ None of this is new. We were arguing for all of it before anyone said the word "
 
 The sharpest thing in the Block piece gets about two sentences of attention.
 
-They describe an intelligence layer that composes capabilities into solutions. When it tries to compose something and can't — because the underlying capability doesn't exist — that failure is the roadmap. Customer reality generates the backlog instead of a product manager hypothesizing about it.
+They describe an intelligence layer that composes capabilities into solutions. When it tries to compose something and can't, because the underlying capability doesn't exist, that failure is the roadmap. Customer reality generates the backlog instead of a product manager hypothesizing about it.
 
 You can build a small version of this now. It doesn't require reorganizing your company.
 
@@ -121,7 +121,7 @@ Then cluster them. Weekly.
 
 That list is more honest than a roadmap, because nobody argued for it in a meeting. It's just what your customers tried to do and couldn't. Most teams already have this data scattered across support tickets, error logs, and abandoned sessions. They just never treated it as a single stream with a name.
 
-I'll confirm this works from the other direction, too. The most valuable output of the conversion pipeline isn't the generated code. It's the list of what it *couldn't* generate cleanly — the grid behavior with no modern equivalent, the procedure whose result shape changes based on a parameter, the validation that only exists as a database trigger. Reality writes that backlog. I just read it.
+I'll confirm this works from the other direction, too. The most valuable output of the conversion pipeline isn't the generated code. It's the list of what it *couldn't* generate cleanly: the grid behavior with no modern equivalent, the procedure whose result shape changes based on a parameter, the validation that only exists as a database trigger. Reality writes that backlog. I just read it.
 
 Start there. It's a week of work and it will tell you more about what to build next quarter than the offsite will.
 
