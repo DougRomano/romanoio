@@ -1,0 +1,142 @@
+---
+title: "You Can't Build a World Model on an Illegible System"
+date: "2026-07-27"
+excerpt: "Block's thesis rests on one sentence they drop almost in passing: everything they do creates artifacts. That's not an organizational choice — it's an architecture choice, and most enterprises made the opposite one fifteen years ago."
+tags: ["AI", "Agentic Development", "Software Architecture", "Spec-Driven Development", "Modernization", "Tech Leadership", ".NET"]
+---
+
+Block published a piece called [From Hierarchy to Intelligence](https://block.xyz/inside/from-hierarchy-to-intelligence). Jack Dorsey and Roelof Botha argue that the org chart is an information routing protocol, that middle management exists because humans were the only thing capable of running that protocol, and that AI is the first mechanism that can replace it.
+
+The historical walk of intelligence and information of the chain of command is good. Roman contubernium, Prussian General Staff, the railroads borrowing West Point engineers, Taylor, the matrix, Spotify squads, Holacracy. Two thousand years of trying to widen span of control without breaking the chain of command.
+
+Most of the commentary on this piece is going to be about org charts. That's the least interesting part.
+
+The interesting part is one sentence Block drops almost in passing, and the entire thesis rests on it.
+
+## What Hasn't Changed
+
+Coordination costs still scale faster than headcount. That's not an AI problem. That's simple math.
+
+A manager exists to answer three questions on behalf of a group: What are we doing? What's blocking us? Who decides? Every layer you add slows the answers. Every layer you remove pushes the questions somewhere else. They don't disappear.
+
+Block's bet is that the "somewhere else" can be a system instead of a person. A continuously maintained model of the business that any individual can query directly, so nobody has to walk information up a chain and back down.
+
+I think that's directionally right. I also think most companies attempting it are going to fail for a reason that has nothing to do with AI.
+
+## The Precondition
+
+Here's the sentence. Block says everything they do creates artifacts. Decisions, discussions, code, designs, plans, problems, progress — all recorded, all machine-readable, because the company is remote-first and the work already lives in text.
+
+That's not an organizational choice. That's an architecture choice, and it happened before any of this was possible.
+
+**You cannot build a model of a business whose operations are not legible.** And the average enterprise system is not legible. I've spent a couple decades in these codebases. Here's what illegible looks like in practice:
+
+- A critical business rule lives in a stored procedure written in 2014. Nobody knows it's there. The person who wrote it left in 2017.
+- The reason one table uses a soft delete and a closely related one uses a hard delete was decided in a Teams thread that scrolled off six months ago.
+- There are three definitions of a core metric — one in the reporting warehouse, one in a query on the dashboard, one in the export the finance team actually trusts.
+- The requirements document describes a workflow the system stopped supporting two releases ago. Nobody updated it because nobody reads it.
+- Half your production behavior is emergent. It's what the code does, not what anyone decided it should do.
+
+Point an AI at that and it will build you a model. The model will be confidently wrong, because the source material is confidently wrong.
+
+Hierarchy is actually good at absorbing this. A senior engineer who has been on the team for six years *is* the world model. She knows the invoice rule is in the proc. She knows which "active user" number the CFO wants. That knowledge is undocumented, unversioned, single-threaded through one person, and it works — right up until she takes another job.
+
+Replacing her with a system means the system needs access to what she knows. Which means writing it down. Which means the boring work.
+
+## What Legible Actually Means
+
+This is not a documentation initiative. Documentation initiatives fail because documentation is a byproduct, and byproducts get skipped under deadline.
+
+**Legibility means the artifact is how the work gets done, not a description of how the work got done.** If you can skip it and still ship, you will skip it.
+
+That's the whole test. Everything below is a way of passing it.
+
+### Specs Before Code — and the Spec Has to Be Load-Bearing
+
+This is why we run spec-driven development, and why the specs live in a governed config repo instead of a folder called `/docs`.
+
+On the modernization work I'm leading, that repo is what we call **SpecKit**: a `WORKFLOW.md` that defines the sequence of operations, and a hierarchy of `CLAUDE.md` files that define the rules and non-negotiables at each level of the codebase. SpecKit governs a ten-agent conversion pipeline that reads a fifteen-year-old VB.NET WinForms application and produces the ASP.NET Core equivalent — DTOs, Dapper repositories, services, controllers, ViewModels, Razor views.
+
+The important property isn't that any of it is written down. It's that it's **load-bearing**.
+
+Agent 2 extracts business rules out of event handlers and writes `business-logic.json`. Agent 3 traces stored procedure parameters and result shapes and writes `data-access.json`. Agent 5 maps the UI layer — UltraGrid to DataTables, UltraCombo to Select2 — and writes `ui-mapping.json`. The template generator cannot produce a repository without all of them.
+
+So when a spec drifts, nothing sits there quietly being wrong. The next agent consumes a stale artifact and the output is broken in a way that surfaces immediately: a filter condition that vanished, a validation rule that doesn't fire, a DTO that doesn't match what the procedure actually returns.
+
+That's the difference between a spec and a document. A document that drifts just sits there. **A spec that drifts breaks the build.**
+
+The same principle scales down to the `CLAUDE.md` hierarchy. Each file declares its place and points to the authoritative source for a given pattern. When four different files described the same query pattern, they drifted apart within weeks — not through carelessness, but because there was no single source and every edit was a coin flip about which copy got updated. One authoritative source per pattern, everything else a pointer, and drift stops being something you police. It becomes structurally impossible.
+
+Here's the part I didn't expect. We didn't set out to build a legibility engine. We set out to convert a WinForms application. But that's what a conversion pipeline turns out to be: a machine that forces an illegible system to become legible, one entity at a time. The JSON artifacts *are* the world model of that application. Nine months in, the pipeline has written down things about that codebase that no living person ever had.
+
+That's the answer to Block's question, at the scale of a single application. It cost nine months and it was worth every week.
+
+### Decisions as Records
+
+ADRs in the repo, next to the code they explain. Not "we chose Dapper over EF Core" but *why*, what we gave up, and what would make us revisit it. Ten of these are worth more to a model than a hundred pages of wiki.
+
+The test again: if the ADR is a deliverable, it rots. If a new pattern can't be introduced without one, it doesn't.
+
+### Business Rules Out of the Database and Into Typed, Testable Code
+
+Not because stored procedures are bad. Because a rule expressed as a named method with a test is legible to a machine, and a rule expressed as fifty lines of T-SQL inside a proc named `usp_ProcessInvoice_v2_FINAL` is not.
+
+This is the single hardest thing my pipeline does, and it's worth being honest about why. The rule isn't in one place. It's split across a nested `If` in a 400-line `btnSave_Click`, a `CHECK` constraint nobody remembers adding, and a branch inside the proc that only fires when a parameter is null. Extracting that into something a machine can reason about is not a translation problem. It's an archaeology problem.
+
+Which is exactly the point. Every enterprise has this. Most have never priced it.
+
+### Structured Telemetry, Not Log Strings
+
+```csharp
+// Data
+_logger.LogInformation("Invoice {InvoiceId} voided by {UserId}, reason {ReasonCode}",
+    invoiceId, userId, reasonCode);
+
+// A sentence someone has to parse
+_logger.LogInformation($"Voided invoice {id}");
+```
+
+One of these feeds a model. The other feeds a grep.
+
+### One Definition per Concept, Enforced
+
+If "active user" means three things, your world model has learned three contradictory facts about your business. Enforced means it fails a test, not that it's in a glossary.
+
+---
+
+None of this is new. We were arguing for all of it before anyone said the word "copilot." What's changed is the payoff. This used to be hygiene that made onboarding faster and outages shorter. Now it's the difference between having a system that understands your business and having an expensive autocomplete.
+
+## The Idea Worth Stealing
+
+The sharpest thing in the Block piece gets about two sentences of attention.
+
+They describe an intelligence layer that composes capabilities into solutions. When it tries to compose something and can't — because the underlying capability doesn't exist — that failure is the roadmap. Customer reality generates the backlog instead of a product manager hypothesizing about it.
+
+You can build a small version of this now. It doesn't require reorganizing your company.
+
+**Instrument the seam where requests meet capabilities.** Every time something is asked for and cannot be served, log it as a structured event: what was requested, what context it came from, which capability was missing. Not an exception. Not a 404 in an access log. A first-class record of an unmet need.
+
+Then cluster them. Weekly.
+
+That list is more honest than a roadmap, because nobody argued for it in a meeting. It's just what your customers tried to do and couldn't. Most teams already have this data scattered across support tickets, error logs, and abandoned sessions. They just never treated it as a single stream with a name.
+
+I'll confirm this works from the other direction, too. The most valuable output of the conversion pipeline isn't the generated code. It's the list of what it *couldn't* generate cleanly — the grid behavior with no modern equivalent, the procedure whose result shape changes based on a parameter, the validation that only exists as a database trigger. Reality writes that backlog. I just read it.
+
+Start there. It's a week of work and it will tell you more about what to build next quarter than the offsite will.
+
+## Where I'd Push Back
+
+Block has an advantage they mention but don't dwell on, and it changes the whole calculation: they see both sides of millions of transactions every day. Buyer through Cash App, seller through Square. That is an extraordinarily rich signal, and it's close to unique.
+
+If your customer signal is a CRM where the opportunity stages were last updated by whoever remembered to, you do not have a world model. You have a database with ambitions.
+
+The second thing: the piece treats management as compression. Route information, pre-compute decisions, maintain alignment. That's part of the job. It is not the job. Good managers absorb ambiguity, take political heat so their team doesn't have to, and make judgment calls where the data genuinely doesn't decide. Spotify, Zappos, and Valve are cited as structural experiments that failed for lack of technology. Maybe. They might also have failed for reasons that no amount of intelligence layer touches.
+
+Block says the transition will be difficult and parts of it will break before they work. I believe them, and I respect that they said it out loud.
+
+But the question they end on is the right one, and it's the one worth carrying into your own shop:
+
+> What does your company understand that is hard to understand, and is that understanding getting deeper every day?
+
+If the answer lives in one senior engineer's head, you don't have an AI strategy problem. You have an architecture problem, and it was there before the AI showed up.
+
