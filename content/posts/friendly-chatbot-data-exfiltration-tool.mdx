@@ -1,0 +1,107 @@
+---
+title: "A Friendly Chatbot Is a Data-Exfiltration Tool Until You Prove Otherwise"
+date: "2026-07-29"
+excerpt: "The demo version of ChatBot would happily answer anything. The production version refuses, scopes, and logs. Here's the authorization model, the write-intent guard that fires before the LLM is even called, and the unglamorous QA cycle that caught the financial-data leaks before users ever saw them."
+tags: ["AI", "Agentic Development", ".NET", "Security", "Authorization", "OpenAI", "Software Architecture", "ASP.NET"]
+series: "Building a Production Chatbot in .NET"
+seriesOrder: 4
+image: "/post-images/friendly-chatbot-data-exfiltration-tool.png"
+---
+
+Here's an uncomfortable way to think about the feature I'd just built. A natural-language interface over your operational and financial data is, from a security standpoint, a very polite query tool that anyone with a login can point at anything. The same fluency that makes it delightful makes it dangerous. It will try to be helpful. "Helpful" and "authorized" are not the same word.
+
+[Part 3](/blog/you-are-not-a-calculator) was about teaching the bot good judgment through prompts. This post is about not *relying* on that judgment for anything that matters. Prompts shape behavior; they don't enforce it. A model can be talked out of a prompt. It cannot be talked out of a C# authorization filter that refuses to run the query.
+
+That distinction, guidance in the prompt and enforcement in the code, is the spine of everything below.
+
+## Authorization is mapped, not improvised
+
+BargeOps already had a real authorization model long before the chatbot existed: role-based filters applied as attributes on controllers and actions. Dispatch, accounting, marketing, logistics, and more. A salesperson doesn't see AP internals. Billing roles gate financial data. This was battle-tested.
+
+The mistake would have been to let the chatbot bypass all of it because requests now arrive as English instead of HTTP routes. So I didn't. Every query type the bot can run is mapped to the authorization filter that governs it, in a dedicated `AuthorizationValidator`:
+
+```csharp
+"calculate_trip_margin"       => "FinancialAuthorizationFilter",
+"get_outstanding_balance..."  => "FinancialAuthorizationFilter",
+"get_idle_barges"             => "AllUserAuthorizationFilter",
+"get_trips_pending_approval"  => "ApproverAuthorizationFilter",
+// ...
+```
+
+When the model decides to call `calculate_trip_margin`, the executor doesn't just run it. It checks whether *this user* is allowed to run that class of query first, against the same filter the equivalent screen would enforce. The AI never becomes a privilege-escalation path, because it's wired into the exact authorization story the rest of the app already uses. The chat interface is new. The permission boundary is not.
+
+This is, again, the enterprise .NET dividend. I didn't design an authorization model for the chatbot. I mapped the chatbot's surface onto the one that already existed and was already trusted.
+
+## The guard that runs before the model
+
+There's a category of request you don't want to send to the language model at all. Not "let the model handle it carefully." Don't let the model see it.
+
+Write intent is the clearest example. ChatBot is read-only by design. It answers questions; it does not change data. But users will absolutely type "void trip 1234" or "update the rate on contract ABC" or "delete those duplicate bills." If you route that to the model and hope the prompt holds, you're one clever phrasing away from trouble, and you're paying for a model round-trip to produce a refusal you could have produced for free.
+
+So the strongest guards fire *before* any tool or LLM call. If you read the git history, you'll find the commits where this hardened:
+
+```text
+fix(chatbot): refuse write-intent requests before any tool/LLM call
+fix(chatbot): harden write-intent guard priority ordering
+fix(chatbot): refuse too-broad requests before any tool/LLM call
+```
+
+A request that expresses intent to mutate data is caught at the door and redirected to the actual screen where that operation lives, with its real permissions and real audit trail. The model is never consulted, because there's no judgment call to make. Read-only means read-only, and the cheapest, safest place to enforce that is before the expensive, probabilistic part of the pipeline.
+
+This is a general principle worth stating plainly: **the safest guard is the one that runs earliest.** Anything you can refuse deterministically, refuse deterministically, before you hand control to a system whose output you can't fully predict.
+
+## The leaks you only find by looking
+
+I want to be honest about the messy middle, because the git history doesn't lie and the tidy version of this story would be useless to you.
+
+The demo bot leaked. Not maliciously. It just answered too eagerly, in ways that only became visible under real data and real roles. All of it surfaced in our own QA cycle, before the feature was in front of users. That's what the cycle is for. The commits that fixed this are some of the most important in the project:
+
+```text
+fix(chatbot): role-aware denial + close financial-data leaks
+fix(chatbot): scope outstanding balance query to named customer
+fix(chatbot): filter status-scoped chat queries to matching records only
+feat(chatbot): customer scoping for trips pending approval
+fix(chatbot): scope trips-pending-approval to last 90 days
+```
+
+Read those as a group and you can see the shape of the problem. Each one is a place where the bot returned *more* than it should have. An outstanding-balance question that wasn't scoped to the customer the user named, so it pulled balances broadly. A status-filtered query that returned records outside the requested status. An approval queue that wasn't bounded to a sensible time window, so it dragged back history nobody asked for.
+
+None of these are exotic AI failures. They're the same over-fetching and under-filtering bugs you'd find in any data layer. But they're *worse* in a chatbot for two reasons. First, the natural-language interface hides the query, so a user can't see that the filter is missing the way they'd notice a wrong filter on a grid. Second, the model's confidence launders the result. A wrong answer arrives in a fluent, authoritative sentence, with none of the visual cues that make a suspicious grid row catch your eye.
+
+The fix in every case was to push the scoping down into the deterministic layer: bind the query to the named customer, enforce the status filter on the records actually returned, bound the time window. Don't trust the model to have scoped correctly. Verify it in code.
+
+## QA against a chatbot is its own discipline
+
+Testing this was unlike testing a normal feature, and I underestimated it.
+
+You can't enumerate the inputs. There are infinite phrasings. So I shifted from testing inputs to testing *behavioral categories*, the same categories the failure templates from Part 3 define. Does a write request get refused regardless of how it's phrased? Does a calculation request get refused and redirected? Does a financial query respect role boundaries? Does an explicit identifier correctly drop prior conversation scope? Each of those is a property I can probe with many phrasings and a consistent expected behavior.
+
+The history shows how iterative and frankly humbling this was. There's a sequence of QA-failure-template fix commits, then a revert, then a re-apply:
+
+```text
+Merged PR: QA failure template fixes
+Revert "Merged PR: QA failure template fixes"
+Merged PR: revert of the QA failure template fixes
+fix(chatbot): unify calculation refusal across all paths
+fix(chatbot): allow summarize, refuse calculate
+```
+
+That revert is the interesting one. A batch of fixes shipped, something regressed, the whole batch came out, and the fixes went back in more carefully, path by path. "Unify calculation refusal across all paths" is the tell. The calculation guard was correct on one code path and missing on another, so the *same* prohibited request behaved differently depending on how it arrived. That's exactly the kind of inconsistency that's invisible in a demo and obvious in QA, and it only got fixed because someone tried the same bad input through multiple doors.
+
+I leaned heavily on agentic workflows and SpecKit to drive this. Specs, plans, and tasks for each fix, so the behavior changes were documented and reviewable rather than improvised. But the discipline is the point, not the tooling. You verify a chatbot by deciding what it must *never* do and then attacking those properties from as many angles as you can invent.
+
+## Audit everything, because someone will ask
+
+Every query the bot runs is logged: the user, the session, the query text, the query type, the timing. There's a `ChatQueryLogService` whose entire job is to make the bot's activity reviewable, and the bot can even answer questions about its own audit log for authorized users.
+
+This isn't optional in an enterprise context, and it's not just for incident response. When someone inevitably asks "can this thing see payroll?" or "what has it been used for?", the answer has to be a query, not a shrug. A feature that touches financial data without an audit trail isn't a feature you can defend in a review. Build the logging in from the start; retrofitting it after the fact is miserable and incomplete.
+
+## The mindset shift
+
+The thing I'd most want you to take from this post is a reframing. When you build a chatbot over real business data, your job is not to make it answer well. That's the easy 80%. Your job is to bound what it can do, scope what it returns, refuse what it shouldn't touch, and log all of it. And to put every one of those guarantees in deterministic code, using the authorization and validation infrastructure your enterprise app already has.
+
+The prompt makes it polite. The code makes it safe. Don't confuse the two.
+
+In the final post, I'll cover what it took to make this fast and durable enough for daily use: caching, performance monitoring, conversation memory, rate limiting, the rebrand from dev codename to customer-facing name, and where I think this goes next, including the MCP-shaped future I keep circling.
+
+*Next up, Part 5: Production Realities. Caching, performance, memory, rate limiting, shipping, and what comes after.*
