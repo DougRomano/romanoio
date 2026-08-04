@@ -1,0 +1,93 @@
+---
+title: "The Boring Parts That Make a Chatbot Real: Caching, Memory, and Shipping"
+date: "2026-08-05"
+excerpt: "The last 20% of ChatBot is the part no demo shows: per-query caching, slow-query monitoring, conversation memory with a hard limit, fuzzy entity matching, rate limiting, and a rebrand. Here is how it became durable in production, and where I think it goes next with MCP."
+tags: ["AI", "Agentic Development", ".NET", "OpenAI", "Caching", "MCP", "Software Architecture", "ASP.NET"]
+series: "Building a Production Chatbot in .NET"
+seriesOrder: 5
+image: "/post-images/boring-parts-that-make-a-chatbot-real.png"
+---
+
+We covered why I built it ([Part 1](/blog/why-i-built-chatbot)), the architecture ([Part 2](/blog/thin-controller-fat-pipeline)), the prompts ([Part 3](/blog/you-are-not-a-calculator)), and the security work ([Part 4](/blog/friendly-chatbot-data-exfiltration-tool)). What remains is the plain work that separates a demo from a feature forty people use each day. This layer does not get attention. It decides whether the feature lasts its first month.
+
+## Caching, because the same questions come back
+
+People ask the same questions often. "Which barges are idle?" comes dozens of times a day. Without caching, each ask is a new stored-procedure call. Some of those queries are expensive.
+
+I covered the *mechanism* in Part 2: `CachedQueryExecutor`, the decorator that wraps the real executor and asks for nothing else from the system. What matters in production is the *policy*. The time-to-live changes by query type. It lives in `appsettings.json`, not in code:
+
+```json
+"ChatService": {
+  "Caching": {
+    "ByQueryType": {
+      "get_idle_barges": 30,
+      "get_expiring_contracts": 300,
+      "calculate_trip_margin": 60
+    }
+  }
+}
+```
+
+Idle barges change by the minute, so use a short TTL. Expiring contracts almost do not move day to day, so use a long one. Because the values are configuration, I change them from real usage without a deploy. You cannot know the right cache duration on day one. You learn it by watching. Keep that control outside the binary so a change costs nothing.
+
+## You cannot fix what you do not measure
+
+Early in the project I added a `QueryPerformanceMonitor`. I am glad I did. It is a singleton, so it collects metrics for the full app lifetime. Each query records total time, database time, AI-processing time, and result count. Any query over five seconds is flagged as slow.
+
+The split between database time and AI time is the one I would keep. When a chat response feels slow, the first question is *where* the time went. Is the stored procedure slow, or is the model round-trip slow? Each cause has a different fix. One leads to SQL index work. The other leads to prompt size, tool count, or model choice. Without the breakdown, you guess. Guessing about latency in a system with many parts is a good way to fix the wrong thing for a week.
+
+On top of the live monitor sits a `DailyReportBackgroundService`. This hosted service runs on a cron schedule and emails an HTML performance summary each morning. It is a small feature. It also means nobody must remember to look. The system tells me how it performs before I ask. That is the posture I want for a feature I am careful about.
+
+## Memory, with a hard limit
+
+A chatbot that forgets each message is hard to use. "Show me trips for ABC Company." "Now just the in-progress ones." The second message has no meaning without the first.
+
+`ConversationContextManager` does this work. It keeps per-user, per-session history in memory. History is limited to a time window so old context does not stay. It is also capped at a fixed number of messages. That cap is intentional. Conversation history is tokens. Tokens are cost and latency. Unlimited history is also a correctness risk. Longer context gives the model more chance to pull an old, wrong filter into a new question. I prefer a bot that remembers the last few turns clearly over one that keeps the full session and mixes it.
+
+This pairs with the disambiguation rule from Part 3. When a user gives an explicit identifier, the bot *drops* prior scope. Memory and forgetting are both features. The skill is to know which to use, and to encode that choice instead of leaving it to chance.
+
+## Fuzzy matching, because people do not type clean
+
+Real users type "ABC Compny." They type "Shel Trading." They half-remember a barge number. A system that only does exact matching answers all of that with "no results found." The user then decides the bot is dumb.
+
+`FuzzyMatchService` softens that. It uses Levenshtein distance to find near-matches above a similarity threshold and suggest the top few. "I could not find 'ABC Compny'. Did you mean **ABC Company**?" That one behavior does more for how smart the bot *feels* than almost anything in the model layer. It is a plain string-distance algorithm with no AI in it. Not every problem in an AI feature is an AI problem.
+
+## The guardrails at the edge
+
+Two items I flagged in Part 2 belong here. They are production-survival features.
+
+The endpoint is rate-limited to 60 queries per hour per user and has a five-minute timeout. The rate limit controls cost and abuse. An LLM-backed endpoint has a spend profile nothing else in your app shares. You do not want a runaway client or a heavy power user to set your monthly bill. The long timeout matches reality. A request that goes to a model, runs a tool, and sometimes goes to the model again is not a 200ms action. A default timeout will cut off valid long queries.
+
+There is also an `ExportService`. It closes the loop on the calculation guardrail from Part 3. The bot will not sum or average for you. It will give you the underlying rows as Excel, CSV, or PDF. You can do the analysis in a tool built for that work. "I will not calculate that, but here is the data so you can" is a better answer than a flat no. Every "no" in this system tries to come with a next step.
+
+## The rebrand: a small thing that was not
+
+Late in the project, the history shows a clear change:
+
+```text
+rebrand(ui): rename Navigator to BargeOps Assistant across all user-visible strings
+rebrand(ui): rename Navigator to BargeOps Assistant (and fix icon spacing)
+feat(navigator): add Ask Chip entry point in left nav (BOPS-4181)
+```
+
+For most of development this thing was "Navigator." It shipped to users as "BargeOps Assistant." That is not only a find-and-replace. The *entry point* and the *framing* are product decisions as real as any line of code. The "Ask Chip" work put a type-to-send prompt in the navigation instead of hiding the bot behind a floating button. That was about discoverability. A strong assistant that nobody notices is a failed feature. How users *find* and *understand* the thing is part of building it. It is easy to leave that for last and then under-invest. I would budget for it earlier next time.
+
+## What I would do differently, and where this goes
+
+A few notes after living with this build.
+
+I would invest in the behavioral test harness from day one instead of growing it after QA failures. The properties I ended up testing (refuse writes, refuse calculations, respect roles, scope to named entities) were knowable from the start. I did not formalize them until failures forced me to.
+
+I would treat the prompt files as first-class from the first commit, not promote them after they became hard to manage. Same lesson, different layer.
+
+And the forward look: this system is one step from being much more useful. Right now the tools are C# methods wired into one application. The next step is to expose them as an [MCP server](/blog/mcp-is-everywhere-dotnet). MCP (Model Context Protocol) is becoming a common integration layer for AI tooling. The same `get_idle_barges`, `calculate_trip_margin`, and `search_trips` tools, exposed over a standard protocol, would be callable not only from this chat widget but from any MCP-aware client: Claude Code, an Agent Framework agent, or what comes next. The business logic stays where it is, validated and trusted. The reach grows. That is the work I am most interested in. It is a short step from where ChatBot already stands, *because* I kept the AI as a thin router over real services from the start.
+
+## The takeaway for the whole series
+
+Across these five posts, one point holds: building a production chatbot is mostly *not* an AI problem. The AI is a thin, contained layer. It is a router that picks which trusted function to call. What makes the system safe, fast, and durable is the engineering you already know: service layers, dependency injection, authorization filters, caching, monitoring, and the discipline to treat prompts and tests as seriously as code.
+
+The demo took days. The product took months. The months went to craft, not magic. The craft is yours to bring. The model cannot do that part for you. That part decides whether what you ship is useful in production or only good in a demo.
+
+That is the whole series. If you build one of these, I would like to hear how it went.
+
+*This concludes the five-part series, Building a Production Chatbot in .NET. Start over at [Part 1](/blog/why-i-built-chatbot).*
