@@ -1,7 +1,7 @@
 ---
 title: "A Friendly Chatbot Is a Data-Exfiltration Tool Until You Prove Otherwise"
 date: "2026-07-29"
-excerpt: "The demo version of ChatBot would answer anything. The production version refuses, scopes, and logs. Here is the authorization model, the write-intent guard that fires before the LLM is called, and the unglamorous QA cycle that caught the financial-data leaks before users saw them."
+excerpt: "The demo version of ChatBot would answer anything. The production version refuses, scopes, and logs. Here is the authorization model, the write-intent guard that fires before the LLM is called, and the unglamorous QA cycle that caught the over-answers before users saw them."
 tags: ["AI", "Agentic Development", ".NET", "Security", "Authorization", "OpenAI", "Software Architecture", "ASP.NET"]
 series: "Building a Production Chatbot in .NET"
 seriesOrder: 4
@@ -10,15 +10,15 @@ image: "/post-images/friendly-chatbot-data-exfiltration-tool.png"
 
 Here is an uncomfortable way to think about the feature I had just built. A natural-language interface over your operational and financial data is a polite query tool. Anyone with a login can point it at anything. The same fluency that makes it useful also makes it dangerous. The bot tries to be helpful. Helpful and authorized are not the same thing.
 
-[Part 3](/blog/you-are-not-a-calculator) was about teaching the bot good judgment through prompts. This post is about not *relying* on that judgment for anything that matters. Prompts shape behavior. They do not enforce it. You can talk a model out of a prompt. You cannot talk it out of a C# authorization filter that refuses to run the query.
+[Part 3](/blog/you-are-not-a-calculator) was about teaching the bot good judgment through prompts. This post is about not *relying* on that judgment for anything that matters. Prompts shape behavior. They are not enough on their own for guarantees that have to hold.
 
-That distinction is the spine of everything below. Guidance goes in the prompt. Enforcement goes in the code.
+That distinction is the spine of everything below. The prompt shapes the everyday experience. The guarantees that matter — what it refuses, what it is allowed to see, what it returns — are enforced in code and reinforced in the prompt, so no single layer is the only thing standing between a clever question and a wrong answer.
 
 ## Authorization is mapped, not improvised
 
 BargeOps had a real authorization model long before the chatbot existed. Role-based filters are applied as attributes on controllers and actions. Dispatch, accounting, marketing, logistics, and more. A salesperson does not see AP internals. Billing roles gate financial data. This model was battle-tested.
 
-The mistake would be to let the chatbot bypass all of it. Requests now arrive as English instead of HTTP routes, but that changes nothing about who is allowed to see what. So I mapped every query type the bot can run to the authorization filter that governs it. This happens in a dedicated `AuthorizationValidator`:
+The mistake would be to let the chatbot bypass all of it. Requests now arrive as English instead of HTTP routes, but that changes nothing about who is allowed to see what. So we mapped every query type the bot can run to the authorization filter that governs it. This happens in a dedicated `AuthorizationValidator`:
 
 ```csharp
 "calculate_trip_margin"       => "FinancialAuthorizationFilter",
@@ -30,7 +30,7 @@ The mistake would be to let the chatbot bypass all of it. Requests now arrive as
 
 When the model decides to call `calculate_trip_margin`, the executor does not just run it. First it checks whether *this user* is allowed to run that class of query. It uses the same filter the equivalent screen would enforce. The AI never becomes a privilege-escalation path. It is wired into the exact authorization story the rest of the app already uses. The chat interface is new. The permission boundary is not.
 
-This is the enterprise .NET dividend again. I did not design a new authorization model for the chatbot. I mapped the chatbot onto the one that already existed and was already trusted.
+This is the enterprise .NET dividend again. We did not design a new authorization model for the chatbot. We mapped the chatbot onto the one that already existed and was already trusted.
 
 ## The guard that runs before the model
 
@@ -54,7 +54,7 @@ The principle is simple. The safest guard is the one that runs earliest. If you 
 
 I want to be honest about the messy middle. The git history does not lie, and a tidy version of this story would not help you.
 
-The demo bot leaked. Not maliciously. It just answered too eagerly. The problems only became visible under real data and real roles. All of them surfaced in our own QA cycle, before the feature reached users. That is what the cycle is for. The commits that fixed this are some of the most important in the project:
+In QA, the demo version over-answered — returning more than a user's role should see. Not maliciously; it was just too eager. We caught all of it in our own review cycle, before the feature reached a single customer. That is what the cycle is for. The commits that fixed this are some of the most important in the project:
 
 ```text
 fix(chatbot): role-aware denial + close financial-data leaks
@@ -74,7 +74,7 @@ The fix was the same every time. Push the scoping down into the deterministic la
 
 Testing this was not like testing a normal feature. I underestimated it.
 
-You cannot enumerate the inputs. There are infinite phrasings. So I stopped testing inputs and started testing *behavioral categories*, the same categories the failure templates from Part 3 define. Does a write request get refused, no matter how it is phrased? Does a calculation request get refused and redirected? Does a financial query respect role boundaries? Does an explicit identifier correctly drop the prior conversation scope? Each of those is a property. I can probe it with many phrasings and one expected behavior.
+You cannot enumerate the inputs. There are infinite phrasings. So we stopped testing inputs and started testing *behavioral categories*, the same categories the failure templates from Part 3 define. Does a write request get refused, no matter how it is phrased? Does a calculation request get refused and redirected? Does a financial query respect role boundaries? Does an explicit identifier correctly drop the prior conversation scope? Each of those is a property. We can probe it with many phrasings and one expected behavior.
 
 The history shows how iterative and humbling this was. There is a sequence of QA-failure-template fix commits, then a revert, then a re-apply:
 
@@ -86,9 +86,9 @@ fix(chatbot): unify calculation refusal across all paths
 fix(chatbot): allow summarize, refuse calculate
 ```
 
-That revert is the interesting one. A batch of fixes shipped. Something regressed. The whole batch came out. Then the fixes went back in more carefully, one path at a time. "Unify calculation refusal across all paths" is the tell. The calculation guard was correct on one code path and missing on another. So the *same* prohibited request behaved differently depending on how it arrived. That kind of inconsistency is invisible in a demo and obvious in QA. It only got fixed because someone tried the same bad input through several doors.
+That revert is the interesting one. A batch of fixes shipped. Something regressed. The whole batch came out. Then the fixes went back in more carefully, one path at a time. "Unify calculation refusal across all paths" is the tell. The calculation guard was correct on one code path and missing on another. So the *same* prohibited request behaved differently depending on how it arrived. That kind of inconsistency is invisible in a demo and obvious in QA. It only got fixed because QA tried the same bad input through several doors.
 
-I leaned on agentic workflows and SpecKit to drive this. Each fix had a spec, a plan, and tasks. That kept the behavior changes documented and reviewable instead of improvised. But the discipline is the point, not the tooling. You verify a chatbot by deciding what it must *never* do. Then you attack those properties from as many angles as you can invent.
+We used agentic workflows and SpecKit to drive this. Each fix had a spec, a plan, and tasks. That kept the behavior changes documented and reviewable instead of improvised. But the discipline is the point, not the tooling. You verify a chatbot by deciding what it must *never* do. Then you attack those properties from as many angles as you can invent.
 
 ## Audit everything, because someone will ask
 
@@ -98,9 +98,9 @@ This is not optional in an enterprise context, and it is not just for incident r
 
 ## The mindset shift
 
-The main thing I want you to take from this post is a reframing. When you build a chatbot over real business data, your job is not to make it answer well. That is the easy part. Your job is to bound what it can do, scope what it returns, refuse what it should not touch, and log all of it. And you put every one of those guarantees in deterministic code, using the authorization and validation infrastructure your enterprise app already has.
+The main thing I want you to take from this post is a reframing. When you build a chatbot over real business data, your job is not to make it answer well. That is the easy part. Your job is to bound what it can do, scope what it returns, refuse what it should not touch, and log all of it. And you put every one of those guarantees in deterministic code, using the authorization and validation infrastructure your enterprise app already has — and reinforce them in the prompt so both layers hold.
 
-The prompt makes it polite. The code makes it safe. Do not confuse the two.
+Do not confuse a polite answer with a safe one.
 
 In the final post, I will cover what it took to make this fast and durable enough for daily use. Caching, performance monitoring, conversation memory, rate limiting, the rebrand from dev codename to customer-facing name, and where I think this goes next, including the MCP-shaped future I keep circling.
 
