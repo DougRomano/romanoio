@@ -76,11 +76,11 @@ For most of development this thing was "Navigator." It shipped to users as "Barg
 
 A few notes after living with this build.
 
-I would invest in the behavioral test harness from day one instead of growing it after QA failures. The properties we ended up testing (refuse writes, refuse calculations, respect roles, scope to named entities) were knowable from the start. We did not formalize them until failures forced us to.
+I would invest in the behavioral test harness from day one instead of growing it after QA failures. The properties I ended up testing (refuse writes, refuse calculations, respect roles, scope to named entities) were knowable from the start. I did not formalize them until failures forced me to.
 
 I would treat the prompt files as first-class from the first commit, not promote them after they became hard to manage. Same lesson, different layer.
 
-And the forward look: this system is one step from being much more useful. Right now the tools are C# methods wired into one application. The next step is to expose them as an [MCP server](/blog/mcp-is-everywhere-dotnet). MCP (Model Context Protocol) is becoming a common integration layer for AI tooling. The same `get_idle_barges`, `calculate_trip_margin`, and `search_trips` tools, exposed over a standard protocol, would be callable not only from this chat widget but from any MCP-aware client: Claude Code, an Agent Framework agent, or what comes next. The business logic stays where it is, validated and trusted. The reach grows. That is the work I am most interested in. It is a short step from where ChatBot already stands, *because* we kept the AI as a thin router over real services from the start.
+And the forward look: this system is one step from being much more useful. Right now the tools are C# methods wired into one application. The next step is to expose them as an [MCP server](/blog/mcp-is-everywhere-dotnet). MCP (Model Context Protocol) is becoming a common integration layer for AI tooling. The same `get_idle_barges`, `calculate_trip_margin`, and `search_trips` tools, exposed over a standard protocol, would be callable not only from this chat widget but from any MCP-aware client: Claude Code, an Agent Framework agent, or what comes next. The business logic stays where it is, validated and trusted. The reach grows. That is the work I am most interested in. It is a short step from where ChatBot already stands, *because* I kept the AI as a thin router over real services from the start.
 
 ## The takeaway for the whole series
 

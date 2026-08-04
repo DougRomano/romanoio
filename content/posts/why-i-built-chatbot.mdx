@@ -42,7 +42,7 @@ That last paragraph is the whole game, by the way. Anybody can wire up the first
 
 Here is the architectural decision that made the rest of the project possible. It is the one I would most want another enterprise .NET developer to take away.
 
-We did not build a new system. We wrapped the one we already had.
+I did not build a new system. I wrapped the one I already had.
 
 The plan for the bot's capabilities was just as deliberate. We broke down the existing UI controller layer and gave the bot the same functionality users already had on screens. Every controller action that answered a question for a user was a candidate tool, so the controllers mapped loosely to the tools we were going to create. That meant the bot's feature list was not speculative. It was an inventory of what the application already did, translated into things you could ask for.
 
@@ -68,7 +68,7 @@ This is a five-part series, and I am writing it as the build log I wish I had wh
 
 - **Part 5:** Production realities. Caching, performance monitoring, conversation memory, rate limiting, the rebrand, and where this goes next.
 
-None of this shipped solo. The Part 4 hardening was a team QA effort, and every prompt change and PR went through review. I built a lot of it with agentic workflows: Claude Code, SpecKit, the whole stack I have written about elsewhere. That mattered enormously, and it will show up throughout. But the AI building the AI is not the interesting part. The interesting part is that the engineering discipline did not change. We still had to design the data flow, decide where the boundaries were, and review every line that touched a customer's money.
+None of this shipped solo. The Part 4 hardening was a team QA effort, and every prompt change and PR went through review. I built almost all of this with agentic workflows: Claude Code, SpecKit, the whole stack I have written about elsewhere. That mattered enormously, and it will show up throughout. But the AI building the AI is not the interesting part. The interesting part is that the engineering discipline did not change. We still had to design the data flow, decide where the boundaries were, and review every line that touched a customer's money.
 
 A chatbot over your business data is one of the highest-leverage things you can build right now. It is also one of the easiest to build *badly*, in a way that does not show up until someone asks the wrong question at the wrong time.
 
