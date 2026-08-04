@@ -1,7 +1,7 @@
 ---
 title: "The Boring Parts That Make a Chatbot Real: Caching, Memory, and Shipping"
 date: "2026-08-05"
-excerpt: "The last 20% of ChatBot is the part no demo shows: per-query caching, slow-query monitoring, conversation memory with a hard limit, fuzzy entity matching, rate limiting, and a rebrand. Here is how it became durable in production, and where I think it goes next with MCP."
+excerpt: "The last 20% of ChatBot is the part no demo shows: per-query caching, slow-query monitoring, conversation memory with a hard limit, fuzzy entity matching, and rate limiting. Here is how it became durable in production, and where I think it goes next with MCP."
 tags: ["AI", "Agentic Development", ".NET", "OpenAI", "Caching", "MCP", "Software Architecture", "ASP.NET"]
 series: "Building a Production Chatbot in .NET"
 seriesOrder: 5
@@ -12,7 +12,7 @@ We covered why I built it ([Part 1](/blog/why-i-built-chatbot)), the architectur
 
 ## Caching, because the same questions come back
 
-People ask the same questions often. "Which barges are idle?" comes dozens of times a day. Without caching, each ask is a new stored-procedure call. Some of those queries are expensive.
+People ask the same questions often. "What's available right now?" comes dozens of times a day. Without caching, each ask is a new stored-procedure call. Some of those queries are expensive.
 
 I covered the *mechanism* in Part 2: `CachedQueryExecutor`, the decorator that wraps the real executor and asks for nothing else from the system. What matters in production is the *policy*. The time-to-live changes by query type. It lives in `appsettings.json`, not in code:
 
@@ -20,7 +20,7 @@ I covered the *mechanism* in Part 2: `CachedQueryExecutor`, the decorator that w
 "ChatService": {
   "Caching": {
     "ByQueryType": {
-      "get_idle_barges": 30,
+      "get_idle_assets": 30,
       "get_expiring_contracts": 300,
       "calculate_trip_margin": 60
     }
@@ -28,7 +28,7 @@ I covered the *mechanism* in Part 2: `CachedQueryExecutor`, the decorator that w
 }
 ```
 
-Idle barges change by the minute, so use a short TTL. Expiring contracts almost do not move day to day, so use a long one. Because the values are configuration, I change them from real usage without a deploy. You cannot know the right cache duration on day one. You learn it by watching. Keep that control outside the binary so a change costs nothing.
+Live operational data changes by the minute, so use a short TTL. Slow-moving reference data almost does not move day to day, so use a long one. Because the values are configuration, I change them from real usage without a deploy. You cannot know the right cache duration on day one. You learn it by watching. Keep that control outside the binary so a change costs nothing.
 
 ## You cannot fix what you do not measure
 
@@ -40,7 +40,7 @@ On top of the live monitor sits a `DailyReportBackgroundService`. This hosted se
 
 ## Memory, with a hard limit
 
-A chatbot that forgets each message is hard to use. "Show me trips for ABC Company." "Now just the in-progress ones." The second message has no meaning without the first.
+A chatbot that forgets each message is hard to use. "Show me records for ACME Corp." "Now just the in-progress ones." The second message has no meaning without the first.
 
 `ConversationContextManager` does this work. It keeps per-user, per-session history in memory. History is limited to a time window so old context does not stay. It is also capped at a fixed number of messages. That cap is intentional. Conversation history is tokens. Tokens are cost and latency. Unlimited history is also a correctness risk. Longer context gives the model more chance to pull an old, wrong filter into a new question. I prefer a bot that remembers the last few turns clearly over one that keeps the full session and mixes it.
 
@@ -48,9 +48,9 @@ This pairs with the disambiguation rule from Part 3. When a user gives an explic
 
 ## Fuzzy matching, because people do not type clean
 
-Real users type "ABC Compny." They type "Shel Trading." They half-remember a barge number. A system that only does exact matching answers all of that with "no results found." The user then decides the bot is dumb.
+Real users type "ACME Corpration." They mistype a customer name. They half-remember an ID. A system that only does exact matching answers all of that with "no results found." The user then decides the bot is dumb.
 
-`FuzzyMatchService` softens that. It uses Levenshtein distance to find near-matches above a similarity threshold and suggest the top few. "I could not find 'ABC Compny'. Did you mean **ABC Company**?" That one behavior does more for how smart the bot *feels* than almost anything in the model layer. It is a plain string-distance algorithm with no AI in it. Not every problem in an AI feature is an AI problem.
+`FuzzyMatchService` softens that. It uses Levenshtein distance to find near-matches above a similarity threshold and suggest the top few. "I could not find 'ACME Corpration'. Did you mean **ACME Corporation**?" That one behavior does more for how smart the bot *feels* than almost anything in the model layer. It is a plain string-distance algorithm with no AI in it. Not every problem in an AI feature is an AI problem.
 
 ## The guardrails at the edge
 
@@ -60,18 +60,6 @@ The endpoint is rate-limited to 60 queries per hour per user and has a five-minu
 
 There is also an `ExportService`. It closes the loop on the calculation guardrail from Part 3. The bot will not sum or average for you. It will give you the underlying rows as Excel, CSV, or PDF. You can do the analysis in a tool built for that work. "I will not calculate that, but here is the data so you can" is a better answer than a flat no. Every "no" in this system tries to come with a next step.
 
-## The rebrand: a small thing that was not
-
-Late in the project, the history shows a clear change:
-
-```text
-rebrand(ui): rename Navigator to BargeOps Assistant across all user-visible strings
-rebrand(ui): rename Navigator to BargeOps Assistant (and fix icon spacing)
-feat(navigator): add Ask Chip entry point in left nav (BOPS-4181)
-```
-
-For most of development this thing was "Navigator." It shipped to users as "BargeOps Assistant." That is not only a find-and-replace. The *entry point* and the *framing* are product decisions as real as any line of code. The "Ask Chip" work put a type-to-send prompt in the navigation instead of hiding the bot behind a floating button. That was about discoverability. A strong assistant that nobody notices is a failed feature. How users *find* and *understand* the thing is part of building it. It is easy to leave that for last and then under-invest. I would budget for it earlier next time.
-
 ## What I would do differently, and where this goes
 
 A few notes after living with this build.
@@ -80,7 +68,7 @@ I would invest in the behavioral test harness from day one instead of growing it
 
 I would treat the prompt files as first-class from the first commit, not promote them after they became hard to manage. Same lesson, different layer.
 
-And the forward look: this system is one step from being much more useful. Right now the tools are C# methods wired into one application. The next step is to expose them as an [MCP server](/blog/mcp-is-everywhere-dotnet). MCP (Model Context Protocol) is becoming a common integration layer for AI tooling. The same `get_idle_barges`, `calculate_trip_margin`, and `search_trips` tools, exposed over a standard protocol, would be callable not only from this chat widget but from any MCP-aware client: Claude Code, an Agent Framework agent, or what comes next. The business logic stays where it is, validated and trusted. The reach grows. That is the work I am most interested in. It is a short step from where ChatBot already stands, *because* I kept the AI as a thin router over real services from the start.
+And the forward look: this system is one step from being much more useful. Right now the tools are C# methods wired into one application. The next step is to expose them as an [MCP server](/blog/mcp-is-everywhere-dotnet). MCP (Model Context Protocol) is becoming a common integration layer for AI tooling. The same trusted tools, exposed over a standard protocol, would be callable not only from this chat widget but from any MCP-aware client: Claude Code, an Agent Framework agent, or what comes next. The business logic stays where it is, validated and trusted. The reach grows. That is the work I am most interested in. It is a short step from where ChatBot already stands, *because* I kept the AI as a thin router over real services from the start.
 
 ## The takeaway for the whole series
 
