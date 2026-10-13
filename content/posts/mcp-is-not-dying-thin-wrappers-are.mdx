@@ -1,0 +1,134 @@
+---
+title: "MCP Is Not Dying. Thin MCP Wrappers Are."
+date: "2026-10-13"
+excerpt: "A founder in my feed predicted MCP would be dead within two years, and the CLI would replace it. He is right about composability and wrong about the deadline. Here is the read from someone who builds both: where the terminal wins, where the protocol earns its keep, and the one question that settles most of the argument."
+tags: ["MCP", "AI", ".NET", "Agentic Development", "Software Architecture", "Security", "Authorization", "Claude Code"]
+image: "/post-images/mcp-is-not-dying-thin-wrappers-are.png"
+---
+
+A post came across my feed this week with a hard claim. MCP will be largely dead within one or two years. Not because agents need fewer integrations, but because command-line interfaces are a stronger foundation for agentic work.
+
+The post came from Henrik Hansson, a founder whose company is all in on CLIs. It collected a couple hundred reactions and over a hundred comments.
+
+The comments were better than the post.
+
+I read every one of them, because I have skin on both sides of this. I wrote [MCP Is Everywhere, But Where Are the .NET Examples?](/blog/mcp-is-everywhere-dotnet) back in March, and I have shipped C# MCP servers since. I also spend most of my working day in a terminal with agents that have a shell, a repo, and a test runner. I have watched both models succeed and both models fail, in production, on client systems.
+
+So here is my read. The composability argument is correct. The death certificate is not.
+
+## The Part That Is Right
+
+Start with the strongest version of the CLI case, because it deserves that.
+
+An MCP tool call is one action. The agent picks a tool, calls it, reads the result, and decides what to do next. There is no native way to combine those calls into a program. Each step costs an inference pass.
+
+A CLI composes. Output pipes into input. Commands go into a script. The script gets a name, a commit, and a second life next month. The agent does not just call your software. It writes new software on top of it.
+
+Discovery works better too. An agent does not need every command loaded into context. It can list what is installed, run `--help`, walk the subcommands, and read only what the current task needs. One binary can expose hundreds of operations and stay quiet until asked.
+
+I have measured the other side of that. When I moved my Claude Code setup [from a 564-line memory file to on-demand skills](/blog/monolith-to-skills-architecture), always-loaded context dropped 82 percent. The procedural knowledge did not shrink. It just stopped shouting all at once. Tool list bloat is the same disease. Connect an agent to twenty servers and you pay for every definition on every turn.
+
+The terminal evidence is also hard to argue with. Coding agents got good in a shell. They read files, run commands, execute tests, read the failure, and try again. That loop is where the money went and where the capability landed. When I [replaced my own 10-agent conversion tool with native subagents](/blog/replaced-conversion-tool-native-subagents), the replacement was not a fancy integration layer. It was files, commands, and a slash-command orchestrator. It works better than the tool it replaced. I run the whole thing [from my phone over Tailscale and tmux](/blog/remote-developer-edge-tmux-tailscale) some evenings.
+
+So yes. Composability compounds. On my machine, the terminal wins.
+
+Now look at the example the post used to prove its case.
+
+## The Bank Example Proves the Other Side
+
+The argument offered a bank. An agent pulls from an internal database, reads Outlook, does the math in Excel, and produces a report. With MCP the agent orchestrates one call at a time. With CLIs it writes a program, saves it, and shares it.
+
+I have built something close to that. I bolted a natural-language assistant onto [a live enterprise billing system](/blog/why-i-built-chatbot). Real operational data. Real customers. A trade show deadline.
+
+The calls were the easy part. I wired the assistant into the existing Dapper service layer, and [the pipeline came together in days](/blog/thin-controller-fat-pipeline). The assistant never touches SQL. It calls the same services the rest of the app calls.
+
+The hard part was everything around the calls. Who is asking. What this user is allowed to see. What happens when the question implies a write. What gets logged, and in what shape, for the person who asks about it next quarter. [That work took longer than the feature](/blog/friendly-chatbot-data-exfiltration-tool). A write-intent guard fires before the model is ever called. Every answer is scoped to the caller. Every tool call is an event with a caller, parameters, a duration, and a result.
+
+A shell gives you none of that at the protocol level. It gives you a process with the ambient rights of whoever started it.
+
+One commenter made the sharpest version of this point. With the `gh` CLI, an agent can do everything the token can do. With a GitHub MCP server exposing two tools, the same agent can do two things. That is not a small difference. Most enterprise systems have coarse permissions and no per-action policy. The CLI inherits all of it. A narrow tool surface is the only place many teams can enforce least privilege at all.
+
+That is why the bank example cuts the other way. Everything in it belongs to the bank. Change one detail, and put the database at a counterparty that has never seen your agent, and the script stops being the interesting part.
+
+## The Question That Settles Most of This
+
+Almost every good comment in that thread was circling the same distinction. Nobody named it, so I will.
+
+**Whose machine is it?**
+
+There are two zones, and they want different things.
+
+**Zone one is the agent's own workspace.** My repo, my container, my box. The agent has a shell, a filesystem, and a test suite. Here, composability is the whole point. Give it real tools, let it write scripts, let it keep the good ones. Do not put a protocol between an agent and `grep`.
+
+**Zone two is someone else's system of record.** Production. A client tenant. A partner API. Here the interface is a contract, not a convenience. It needs a caller identity, a scoped permission, an approval path for dangerous actions, and a record of what happened. You will build that layer whether you want to or not. MCP is one wire format for it. The alternative is not "no protocol." The alternative is a protocol you invented on a Thursday.
+
+My working rule: **composability inside the workspace, contracts at the boundary.**
+
+That rule is not a compromise position. It is what my own systems already look like, and I did not plan it that way. It is just where production pushed me.
+
+## What Actually Dies
+
+Something in this debate really is dying. It is just not the protocol.
+
+**Thin wrappers die.** If your MCP server is one tool per REST endpoint, you built a worse SDK. It adds a hop, a token bill, and a definition the model has to read on every turn. It buys nothing.
+
+**Endpoint-shaped servers die.** A commenter in that thread put it well: MCP should be designed around agentic intent, not around a programmatic interface built for humans. Agreed, and this is where most MCP servers fail. Forty CRUD tools is a bad server. My billing assistant has four tools, and each one answers a question a person actually asks. That is not a limitation. That is the design.
+
+**Always-loaded catalogs die.** Nobody should mount twenty servers at startup and pay for all of them on every turn. Load on demand, the same way a good CLI stays quiet until you run `--help`.
+
+What survives is a small, boring, well-governed surface at the edge of systems nobody will hand a shell to. That is most of the enterprise.
+
+## Composability Was Never Exclusive to Pipes
+
+Here is the technical hole in the original argument.
+
+The claim assumes MCP means one call per inference pass, forever. It already does not. Anthropic shipped Programmatic Tool Calling, and I wrote about it in [Stop Chatting with Your LLM. Start Compiling.](/blog/stop-chatting-start-compiling) The model writes code that orchestrates the tools. Intermediate results stay out of the context window. Fewer tokens, better accuracy, and a saveable program at the end.
+
+That is the composability story, and it does not need a pipe. It needs a runtime and typed capabilities.
+
+So the honest framing is not CLI versus MCP. It is direct tool calls versus composed tool calls. Direct calls are the weak part, and they are already being replaced. The integration layer underneath survives the change.
+
+Expect the experience to feel more like a terminal. Expect the wire to stay a protocol.
+
+## The Audit Point Nobody Wants to Hear
+
+One more thing from the comments, and it is the one I would put on a whiteboard.
+
+A tool call is a record by construction. A named tool, named parameters, a result, a timestamp. You get the audit trail whether you were thinking about it or not.
+
+A composed shell pipeline is a record only if somebody deliberately built one. What lands in the log is a command string and some stdout.
+
+For a weekend script, that does not matter. For anything a regulator or a supervisor can ask about in two years, it is the whole game. The question is never what the agent could do. It is what you can reconstruct about what it did, from what was written down at the time.
+
+This is the same argument I made in [You Can't Build a World Model on an Illegible System](/blog/illegible-system). Artifacts are an architecture choice. If your agents produce none, you have an illegible system with better throughput.
+
+And there is a visibility trade here that cuts against my own preferences. A hundred noisy tool definitions is a visible problem. A hundred agent-written scripts that nobody owns is an invisible one. I would rather debug the visible one.
+
+## What I Would Do Monday Morning
+
+If you architect .NET systems and you have to make a call this quarter, this is the shape I would build.
+
+1. **Give agents a real terminal in their own workspace.** Shell, repo, tests, build. Do not wrap what the filesystem already does well.
+2. **Ship a CLI for your internal tools.** Your own scripts, your own generators, your own migration steps. This is where composability pays, and it costs you almost nothing.
+3. **Keep a protocol at the boundary.** Anything that touches production, a client tenant, or a partner gets a narrow tool surface with a caller identity attached.
+4. **Design tools around intent and count them.** If you have more than a handful per server, you are exposing your schema instead of your capabilities.
+5. **Load servers on demand.** Treat context like a budget, because it is one.
+6. **Log every tool call as a structured event.** Caller, tool, parameters with sensitive fields redacted, duration, result.
+7. **Put write intent behind a guard that runs before the model does.** Not in the prompt. In the code.
+8. **Return structured errors.** Tell the agent whether it was permissions, a timeout, or bad input, so it can decide to retry or stop. Opaque exceptions across the boundary teach the model nothing.
+
+None of that is a bet on which side of the LinkedIn argument wins. All of it is work you keep either way.
+
+## My Prediction
+
+MCP will not be dead in two years. It will be boring.
+
+It will stop being a topic and become plumbing, in the same way HTTP did. It will sit at the edges of systems that need a caller, a permission, and a log line. Agents will compose it through code instead of calling it one tool at a time. Most people will stop noticing it is there.
+
+Meanwhile the terminal keeps winning inside the workspace, because that is where agents learned to work and because a pipe is still the cheapest composition primitive ever built.
+
+I also notice that the two-year deadline came from a founder whose product is all in on CLIs. I am not holding that against him. The composability argument stands on its own, and he made it better than most people arguing the other side. But "the standard my competitor uses is about to die" is a claim that arrives with a motive, and it is worth reading it that way.
+
+I have spent 30-plus years watching people announce the death of protocols that were merely inconvenient. The ones that die are the ones that solve nothing. MCP solves identity, scope, and evidence at a boundary. That problem is not going anywhere.
+
+Build the CLI. Keep the contract. Ship the audit trail.
