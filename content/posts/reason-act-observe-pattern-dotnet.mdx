@@ -1,0 +1,270 @@
+---
+title: "The Reason-Act-Observe Pattern in .NET"
+date: "2026-09-15"
+excerpt: "ReAct is usually presented as a prompting trick. It is really a design pattern, and if you have shipped function calling you already implement it badly. Here are the participants, the C# implementation, the trust boundary, and the consequences."
+tags: [".NET", "C#", "AI", "Agentic Development", "Software Architecture", "Patterns", "OpenAI"]
+image: "/post-images/reason-act-observe-pattern-dotnet.png"
+---
+
+Google Research published [ReAct](https://research.google/blog/react-synergizing-reasoning-and-acting-in-language-models/) in November 2022. Yao and Cao argued that a language model should interleave reasoning traces with actions instead of doing one or the other. Almost every write-up since has treated it as a prompting technique.
+
+It is not a prompting technique. It is a design pattern, in the same sense that Strategy and Decorator are design patterns: a named structure with participants, collaborations, and consequences you have to live with.
+
+And here is the part that should bother you. If you have shipped OpenAI function calling in a .NET application, you have already implemented this pattern. You probably implemented it accidentally, without a turn limit, without a trust boundary, and without a name. That is what this post is for.
+
+## Intent
+
+**Let a model alternate between reasoning about a goal and taking bounded actions against the outside world, so that each observation constrains the next thought.**
+
+Compare that to the two degenerate cases the paper measures:
+
+- **Chain of thought (reason only).** The model reasons but never touches the world. When a fact is wrong, it cannot go look it up. It confabulates instead.
+- **Act only.** The model calls tools but holds no plan across steps. It thrashes.
+
+The paper's numbers are more honest than the marketing around them. On HotpotQA, ReAct scored 27.4 and chain of thought scored 29.4 — ReAct alone *lost*. The two combined scored 35.1 and won. On the interactive benchmarks the gap is wider: ALFWorld 71 against 45 for act-only, WebShop 40 against 30.1.
+
+The takeaway is not "add a loop." It is that grounded observations and internal knowledge have to reinforce each other, and neither one alone is enough.
+
+## Structure
+
+The pattern has five participants. Four of them live in your code, and only one of them is the model.
+
+```text
+                 +-------------------+
+   question ---> |     Reasoner      |  (LLM: emits Thought + optional Action)
+                 +-------------------+
+                    |            ^
+             Action |            | Observation
+                    v            |
+                 +-------------------+
+                 |   Loop Governor   |  (turn limit, deadline, token budget)
+                 +-------------------+
+                          |
+                          v
+                 +-------------------+
+                 |   Tool Executor   |  <-- TRUST BOUNDARY
+                 +-------------------+
+                          |
+                          v
+                 +-------------------+
+                 |    Environment    |  (Dapper services, SQL Server, files)
+                 +-------------------+
+```
+
+| Participant | Responsibility | Who implements it |
+|---|---|---|
+| **Reasoner** | Emits a thought and, optionally, a named action with arguments | The model |
+| **Tool Catalog** | Declares the actions that exist, with typed schemas and descriptions | You |
+| **Loop Governor** | Decides whether another turn is allowed at all | You |
+| **Tool Executor** | Validates the action, runs it, shapes the observation | You |
+| **Observation** | The bounded, truncated result fed back into context | You |
+
+The critical collaboration is the one people skip: **a thought writes to context, an action writes to the world.** Those are different operations with different blast radii, and they belong behind different gates.
+
+## Implementation
+
+Start with the Loop Governor, because it is the participant everybody omits and the one that saves you.
+
+```csharp
+public sealed record AgentBudget
+{
+    public int MaxTurns { get; init; } = 5;
+    public int MaxToolCalls { get; init; } = 8;
+    public TimeSpan Deadline { get; init; } = TimeSpan.FromMinutes(5);
+    public int MaxObservationChars { get; init; } = 8_000;
+}
+```
+
+Four limits, all boring, all load-bearing. `MaxTurns` stops a model that has decided to keep searching forever. `Deadline` matches reality: a request that hits a model, runs a tool, and hits the model again is not a 200ms MVC action. `MaxObservationChars` is the one people learn the hard way — an unbounded observation is how a single `SELECT` blows out your context window and your bill.
+
+Now the loop itself:
+
+```csharp
+public sealed class ReActAgent
+{
+    private readonly IReasoner _reasoner;
+    private readonly IToolExecutor _executor;
+    private readonly AgentBudget _budget;
+    private readonly ILogger<ReActAgent> _logger;
+
+    public async Task<AgentResult> RunAsync(string question, CancellationToken ct)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(_budget.Deadline);
+
+        var transcript = Transcript.Start(question);
+        var toolCalls = 0;
+
+        for (var turn = 1; turn <= _budget.MaxTurns; turn++)
+        {
+            var step = await _reasoner.NextStepAsync(transcript, cts.Token);
+
+            if (step.IsFinalAnswer)
+                return AgentResult.Answered(step.Text, turn, toolCalls);
+
+            if (++toolCalls > _budget.MaxToolCalls)
+                return AgentResult.BudgetExceeded("tool call cap", turn);
+
+            var observation = await _executor.ObserveAsync(step.Action!, cts.Token);
+            transcript = transcript.Append(step, observation);
+
+            _logger.LogInformation(
+                "ReAct turn {Turn}: {Tool} -> {Outcome}",
+                turn, step.Action!.Name, observation.Outcome);
+        }
+
+        return AgentResult.BudgetExceeded("turn limit", _budget.MaxTurns);
+    }
+}
+```
+
+Read what that `for` loop is doing. It is a bounded interpreter over a non-deterministic instruction stream. Every exit is explicit and named: the model answered, the tool cap tripped, the turn limit tripped, or the deadline cancelled. There is no path where this thing runs forever, and that property is structural rather than prompted.
+
+### The executor is the trust boundary
+
+This is where the pattern earns its keep in an enterprise codebase. The model does not call your database. It *names a door* and your code decides whether that door opens.
+
+```csharp
+public sealed class ToolExecutor : IToolExecutor
+{
+    private readonly IQueryExecutor _queries;
+    private readonly IToolCatalog _catalog;
+    private readonly AgentBudget _budget;
+
+    public async Task<Observation> ObserveAsync(ToolCall call, CancellationToken ct)
+    {
+        if (!_catalog.TryGet(call.Name, out var tool))
+            return Observation.Rejected($"Unknown tool '{call.Name}'.");
+
+        if (tool.Effect is not ToolEffect.ReadOnly)
+            return Observation.Rejected($"Tool '{call.Name}' is not permitted.");
+
+        if (!tool.TryBindArguments(call.Arguments, out var args, out var bindError))
+            return Observation.Rejected(bindError);
+
+        try
+        {
+            var result = await _queries.ExecuteQueryAsync(call.Name, args, ct);
+            return Observation.FromResult(result, _budget.MaxObservationChars);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // A failed action is an observation, not an exception the loop should see.
+            return Observation.Failed($"'{call.Name}' failed: {ex.Message}");
+        }
+    }
+}
+```
+
+Three things in there are deliberate.
+
+The read-only check is **in code, not in a prompt**. A prompt that says "never modify data" is a suggestion. A `ToolEffect` enum checked before dispatch is a guarantee. I have watched people put that rule in a system message and call it security.
+
+Arguments get bound and validated before dispatch, the same as any model binder. The model produces JSON that it believes matches your schema. Believe the schema, not the model.
+
+A tool failure becomes an `Observation`, not a thrown exception. This matters more than it looks. In ReAct, "that query returned nothing" is *information* — it is exactly the feedback that lets the next thought correct course. If you let it escape as an exception, you have converted a self-correcting loop into a 500.
+
+Underneath, `IQueryExecutor` is the same interface the rest of the application already uses, which means the caching Decorator I wrote about in [Thin Controller, Fat Pipeline](/blog/thin-controller-fat-pipeline) composes for free:
+
+```csharp
+services.AddScoped<QueryExecutor>();
+services.AddScoped<IQueryExecutor>(sp =>
+    new CachedQueryExecutor(
+        sp.GetRequiredService<QueryExecutor>(),
+        sp.GetRequiredService<IMemoryCache>(),
+        sp.GetRequiredService<IConfiguration>()));
+```
+
+The agent asks for `IQueryExecutor` and gets a cached one. It never learns that caching exists. That is Decorator doing exactly what it is for, and it is the argument for keeping ReAct's Action step behind an ordinary .NET interface instead of a bespoke agent framework.
+
+## Variation: Verified Observation, for unattended runs
+
+The paper claims interleaved traces improve interpretability and diagnosability, because a human can read the trace and spot the error. That claim assumes a human is reading.
+
+My nine legacy extraction subagents convert twenty-year-old VB.NET WinForms into ASP.NET Core. They run in parallel, usually while I am in a meeting. Every one of them carries the opposite instruction:
+
+```markdown
+- Private scratchpad: think step-by-step privately; do not reveal chain-of-thought.
+```
+
+When nobody watches the trace, the trace is cost without value. So the variation moves diagnosis from the *thought* to the *artifact*:
+
+```csharp
+public static Observation Verify(
+    string tmpPath,
+    string finalPath,
+    IReadOnlyCollection<string> requiredKeys,
+    string agentResponse)
+{
+    if (agentResponse.Contains("ANALYSIS_BLOCKED:", StringComparison.Ordinal))
+        return Observation.Failed("agent reported blocked input");
+
+    if (!File.Exists(tmpPath) || new FileInfo(tmpPath).Length == 0)
+        return Observation.Failed("no output written");
+
+    using var doc = JsonDocument.Parse(File.ReadAllText(tmpPath));
+    var missing = requiredKeys
+        .Where(k => !doc.RootElement.TryGetProperty(k, out _))
+        .ToList();
+
+    if (missing.Count > 0)
+        return Observation.Failed($"missing keys: {string.Join(", ", missing)}");
+
+    File.Move(tmpPath, finalPath, overwrite: true); // atomic promotion
+    return Observation.Ok(finalPath);
+}
+```
+
+Write to `.tmp`, verify, then promote with an atomic rename. A failed check leaves the last good file untouched. A file that parses but comes back as `{}` is treated as a failure, because a half-written artifact is worse than none — something downstream will trust it.
+
+That is the honest split between the research and production practice. **The paper inspects the thought. Unattended systems inspect the artifact.** Both find errors; only one of them works at 2am.
+
+## Variation: Precomputed Plan
+
+The other refinement is knowing when *not* to use the pattern.
+
+My nine subagents do not choose their own order. A command runs them in three waves: wave 1 alone because everything cross-references its output, wave 2 with two agents in parallel, wave 3 fanning out the remaining six. I already know that dependency graph. Encoding it as a schedule costs nothing and never varies.
+
+So the rule is: **let the model reason inside a phase, not about the schedule.** Reasoning is for the messy part — reading a `BrokenRules.Assert` tangle and deciding what it means. It is not for re-deriving an execution order you could have written in a `switch`. Every turn you hand the loop is latency, tokens, and one more chance to be creative where you wanted determinism.
+
+## Consequences
+
+| You gain | You pay |
+|---|---|
+| Self-correction: a bad result becomes feedback, not a failure | Every turn is another inference pass — latency compounds |
+| Grounded answers instead of confabulated ones | Token spend scales with turns, not with question complexity |
+| An auditable action log at the executor | Non-deterministic step count makes latency budgeting hard |
+| Tools stay ordinary, testable .NET services | Requires explicit governance you must build, not configure |
+
+Two production consequences are worth stating in numbers, because a benchmark has no budget column. My chat endpoint carries a five-minute timeout, because a multi-turn request genuinely takes that long in the tail. It also caps users at 60 queries per hour, because an LLM-backed endpoint has a spend profile nothing else in your app shares, and one runaway client should not set your monthly bill.
+
+## When to use it, and when not to
+
+| Use Reason-Act-Observe | Reach for something simpler |
+|---|---|
+| The next action depends on what the last one returned | A single tool call answers the question |
+| The question needs facts your model cannot hold | The workflow order is known in advance (use a Precomputed Plan) |
+| Search, disambiguation, or "find the record they meant" | Writes or anything irreversible |
+| Recovery from empty or wrong results matters | Latency budget is measured in milliseconds |
+
+That third row on the right is the one I would tattoo on a wall. An unbounded reason-act loop with write access to a production database is not an architecture. It is an incident with a research citation.
+
+## Related patterns
+
+| Pattern | Relationship |
+|---|---|
+| **Command** | Each tool is a command object: named, parameterized, validated, dispatched |
+| **Decorator** | Caching, logging, and rate limiting wrap the executor without the loop knowing |
+| **Interpreter** | The loop interprets a non-deterministic instruction stream against a bounded grammar |
+| **Circuit Breaker** | The Loop Governor is a breaker for cognition instead of I/O |
+| **Result** | Observations are `Result`-shaped: failure is a value the loop reads, not an exception ([post](/blog/result-pattern-dotnet)) |
+
+---
+
+The core insight is the same one behind the Result pattern: make the contract explicit and the structure will carry you.
+
+ReAct's contribution was never the prompt format. It was noticing that reasoning and acting need to be separate operations that feed each other. Everything that makes it survivable in production — the turn limit, the read-only catalog, the bound observation, the verified artifact — is ordinary .NET engineering applied to a participant that happens to be non-deterministic.
+
+The model is one participant in the pattern. You own the other four. Most agent failures I have debugged were failures in the four you own.
+
+*The chatbot in this post is the subject of [Building a Production Chatbot in .NET](/blog/why-i-built-chatbot). The nine extraction subagents are the subject of [I Replaced My Own Conversion Tool](/blog/replaced-conversion-tool-native-subagents).*
