@@ -8,9 +8,11 @@ seriesOrder: 1
 image: "/post-images/python-for-the-dotnet-developer.png"
 ---
 
-I run a software-defined radio (SDR) at home. It picks up the AIS signals that boats send and the ADS-B signals that planes send.
+I live in Kimmswick, on the Mississippi River. I can see the barges move up and down the river. I also run a software-defined radio (SDR) at home. It picks up the AIS signals that boats send and the ADS-B signals that planes send. The dots on my screen move with the tows I can see outside.
 
-Over several weeks I will move from C# and SQL Server to a lakehouse on Azure Databricks, Microsoft Fabric and Microsoft Foundry. The dataset is public river data.
+The plane traffic comes from an ADS-B capture on a Raspberry Pi. That feed lands on my Unraid server, where Docker runs Postgres containers that store the tracks. Boats and planes both show up as rows I can query.
+
+That river is the dataset for this series. Over several weeks I will move from C# and SQL Server to a lakehouse on Azure Databricks, Microsoft Fabric and Microsoft Foundry. I will build it in public, on the river I look at every day.
 
 All of the data is public. River gauge readings come from the U.S. Geological Survey (USGS). Lock traffic comes from the U.S. Army Corps of Engineers (USACE). Weather comes from NOAA. There is no client data and no proprietary data. This project is for learning, and anyone can run it.
 
