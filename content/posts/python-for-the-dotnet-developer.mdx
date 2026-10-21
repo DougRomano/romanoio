@@ -1,16 +1,16 @@
 ---
 title: "Python for the .NET Developer: What Maps and What Doesn't"
 date: "2026-10-20"
-excerpt: "Steps to move from C# and SQL Server to the lakehouse: I ported a vessel-tracking stored procedure to Python, on public river data. The syntax took a day. The rules took the week."
+excerpt: "Part 1 of 14 planned posts on moving from C# and SQL Server to the lakehouse. I ported a vessel-tracking stored procedure to Python on public river data. The syntax took a day. The rules took much longer."
 tags: ["Python", ".NET", "C#", "SQL Server", "Data Engineering", "pandas", "Lakehouse"]
 series: "From SQL Server to the Lakehouse"
 seriesOrder: 1
 image: "/post-images/python-for-the-dotnet-developer.png"
 ---
 
-I live on the Mississippi River about 20 miles south of St. Louis. In the fall, I can see the barges move up and down the river. I also run a software-defined radio (SDR) at home. It picks up the AIS signals that boats send and the ADS-B signals that planes send. The dots on my screen move with the tows I can see outside.
+I live on the Mississippi River about 20 miles south of St. Louis. I can see the barges move up and down the river. I also run a software-defined radio (SDR) at home. It picks up the AIS signals that boats send and the ADS-B signals that planes send. The dots on my screen move with the tows I can see outside.
 
-That river is the dataset for this series. This is Part 1 of 14 planned posts. Across them I will move from C# and SQL Server to a lakehouse on Azure Databricks, Microsoft Fabric and Microsoft Foundry.
+That river is the dataset for this series. All of the data is public: USGS river gauges, USACE lock traffic and NOAA weather. There is no client data. This is Part 1 of 14 planned posts. Across them I will move from C# and SQL Server to a lakehouse on Azure Databricks, Microsoft Fabric and Microsoft Foundry.
 
 Most "Python for C# developers" guides teach syntax. Syntax was not my problem. I can read a `for` loop in any language.
 
@@ -46,7 +46,7 @@ make check
 
 `make check` runs pytest and ruff with the project environment. I do not activate the environment by hand. The Makefile calls `.venv/bin/pytest` directly.
 
-I turned on one ruff rule set early: `DTZ`. It rejects any `datetime` without a time zone. That rule paid for itself in week 1.
+I turned on one ruff rule set early: `DTZ`. It rejects any `datetime` without a time zone. That rule paid for itself right away.
 
 ## What Maps: Same Idea, Different Words
 
@@ -79,7 +79,7 @@ if i < 0:
 left = ordered[i]
 ```
 
-`bisect_right` returns the position after the last equal timestamp. So `ordered[i + 1]` is always later than `t`. That is the `p2.Ts > p1.Ts` check from the procedure. `bisect_left` stops on the first duplicate. With duplicates, that gives a time span of zero and a divide by zero.
+`bisect_right` returns the position after the last equal timestamp. So `ordered[i + 1]` is always later than `t`. That is the `ObservedAt > i.GridTime` condition in the second `OUTER APPLY`. `bisect_left` stops on the first duplicate. With duplicates, that gives a time span of zero and a divide by zero.
 
 The `i < 0` check is the procedure's `WHERE p1.Id IS NOT NULL`. Each SQL rule became one line of Python.
 
@@ -144,11 +144,17 @@ I expected one pandas call to do the whole job. It does not. `merge_asof` is an 
 So the pandas version needs two joins, the same as the two `OUTER APPLY` blocks:
 
 ```python
-left = pd.merge_asof(grid_frame, ordered, left_on="grid_time",
-                     right_on="left_time", by=by, direction="backward")
-right = pd.merge_asof(grid_frame, ordered, left_on="grid_time",
-                      right_on="right_time", by=by, direction="forward",
-                      allow_exact_matches=False)
+left = pd.merge_asof(
+    grid_frame,
+    ordered.rename(columns={"observed_at_utc": "left_time", "value": "left_value"}),
+    left_on="grid_time", right_on="left_time", by=by, direction="backward",
+)
+right = pd.merge_asof(
+    grid_frame,
+    ordered.rename(columns={"observed_at_utc": "right_time", "value": "right_value"}),
+    left_on="grid_time", right_on="right_time", by=by, direction="forward",
+    allow_exact_matches=False,
+)
 ```
 
 The backward join is `bisect_right - 1`. The forward join with `allow_exact_matches=False` is `ordered[i + 1]`. The math comes after both joins. My first halfway value was 4.0 instead of 6.0, because I had only the left join.
@@ -184,9 +190,11 @@ The fix is a two-hour limit. The gauges report about every 30 minutes, so two ho
 ```python
 MAX_GAP = timedelta(hours=2)
 
-if right.observed_at_utc - left.observed_at_utc > max_gap:
-    found.append((t, None))
-    continue
+def interpolate_at(readings, grid, max_gap: timedelta = MAX_GAP):
+    ...
+    if right.observed_at_utc - left.observed_at_utc > max_gap:
+        found.append((t, None))
+        continue
 ```
 
 The same limit applies after the last reading. Now a long outage is an honest gap.
@@ -201,7 +209,7 @@ The tests found three more problems. All three were mine.
 
 Some tests never failed. The duplicate test passed on the first run, because the earlier `bisect_right` rule already handled it. That told me something too: one rule can cover the next case.
 
-## Week 1 by the Numbers
+## Part 1 by the Numbers
 
 | Item | Result |
 | --- | --- |
@@ -213,12 +221,12 @@ Some tests never failed. The duplicate test passed on the first run, because the
 
 One example from the live run: St. Louis read 12.88 feet at 20:00 UTC and 12.86 feet at 20:30. The 20:15 slot came out at 12.87 feet.
 
-Eight requests did not make eight files. The USGS API returns at most 10,000 readings per page. Each series had about 17,000, so each request needed two pages. One API call is not one file. The landing code has to follow the `next` link until it runs out.
+Eight requests did not make eight files. My client asks for 10,000 readings per page. Each series had about 17,000, so each request needed two pages. One API call is not one file. The landing code has to follow the `next` link until it runs out.
 
-## Next Up: Spark Has No merge_asof
+## Next Up: An As-Of Join in Spark SQL
 
-pandas runs on one machine. Next week the data moves to Databricks, and Spark has no `merge_asof`. I will build the as-of join again from window functions. That is where T-SQL should finally pay off.
+pandas runs on one machine. In Part 2 the data moves to Databricks. Spark SQL and the DataFrame API have no as-of join. The pandas API on Spark has `merge_asof`, but I want to see the plan, so I will build the join from window functions. That is where T-SQL should finally pay off.
 
-The lesson from week 1 is simple. The syntax took a day. The rules took the week. Python did not break my code. It removed the safety nets I did not know I had.
+The lesson from Part 1 is simple. The syntax took a day. The rules took much longer. Python did not break my code. It removed the safety nets I did not know I had.
 
 Next up, Part 2: a T-SQL to PySpark Rosetta Stone.
