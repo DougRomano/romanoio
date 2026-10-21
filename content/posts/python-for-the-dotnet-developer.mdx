@@ -1,0 +1,226 @@
+---
+title: "Python for the .NET Developer: What Maps and What Doesn't"
+date: "2026-10-15"
+excerpt: "Week 1 of a 20-week move from C# and SQL Server to the lakehouse: I ported a vessel-tracking stored procedure to Python, on public river data. The syntax took a day. The rules took the week."
+tags: ["Python", ".NET", "C#", "SQL Server", "Data Engineering", "pandas", "Lakehouse"]
+series: "From SQL Server to the Lakehouse"
+seriesOrder: 1
+image: "/post-images/python-for-the-dotnet-developer.png"
+---
+
+I run a software-defined radio (SDR) at home. It picks up the AIS signals that boats send and the ADS-B signals that planes send.
+
+Over several weeks I will move from C# and SQL Server to a lakehouse on Azure Databricks, Microsoft Fabric and Microsoft Foundry. The dataset is public river data.
+
+All of the data is public. River gauge readings come from the U.S. Geological Survey (USGS). Lock traffic comes from the U.S. Army Corps of Engineers (USACE). Weather comes from NOAA. There is no client data and no proprietary data. This project is for learning, and anyone can run it.
+
+Most "Python for C# developers" guides teach syntax. Syntax was not my problem. I can read a `for` loop in any language.
+
+My problem was trust. I have three decades of .NET and SQL Server habits. I did not know which habits still work in Python. I also did not know which habits give wrong answers without an error.
+
+I have solved this kind of problem before, in C#. I worked on a vessel-tracking system that used AIS data. Boats report their position when they want to, not on a schedule. The reports needed every boat on a fixed 15-minute grid. A SQL Server stored procedure did that work.
+
+River gauges have the same shape. Each gauge reports on its own clock. To compare them, I need one shared grid. So I did not start with a tutorial. I took that interpolation logic and ported it to Python, one test at a time.
+
+The code lives in [river-nav-lakehouse](https://github.com/DougRomano/river-nav-lakehouse). This post covers what maps from C# to Python, what does not, and the bug that both versions shared.
+
+## The Toolchain: Easier Than I Expected
+
+The tools were the easy part. Each .NET tool has a Python match:
+
+| .NET | Python | What it does |
+| --- | --- | --- |
+| `global.json` | `.python-version` | Pins the runtime for the repo |
+| `.csproj` | `pyproject.toml` | Holds dependencies and tool settings |
+| `dotnet` CLI and NuGet | `uv` | Installs Python, creates the environment, installs packages |
+| `obj/` restore folder | `.venv/` | Keeps packages local to the project |
+| Roslyn analyzers | `ruff` | Lints and formats |
+| xUnit | `pytest` | Runs the tests |
+
+This is the full setup:
+
+```bash
+uv python install 3.12
+uv venv
+uv pip install -e ".[dev]"
+make check
+```
+
+`make check` runs pytest and ruff with the project environment. I do not activate the environment by hand. The Makefile calls `.venv/bin/pytest` directly.
+
+I turned on one ruff rule set early: `DTZ`. It rejects any `datetime` without a time zone. That rule paid for itself in week 1.
+
+## What Maps: Same Idea, Different Words
+
+A C# `record` is a frozen dataclass in Python. You get an immutable value with equality:
+
+```python
+@dataclass(frozen=True)
+class Reading:
+    observed_at_utc: datetime
+    value: float | None
+```
+
+`yield return` is `yield`. LINQ is a comprehension. A `datetime` with a time zone is a `DateTimeOffset`. None of this was hard.
+
+The best match was a surprise. My stored procedure finds the last reading at or before a grid time:
+
+```sql
+SELECT TOP 1 *
+FROM dbo.Reading
+WHERE ObservedAt <= @t
+ORDER BY ObservedAt DESC
+```
+
+In Python, that is one call to `bisect_right` on a sorted list of timestamps:
+
+```python
+i = bisect_right(times, t) - 1
+if i < 0:
+    continue  # no reading at or before t
+left = ordered[i]
+```
+
+`bisect_right` returns the position after the last equal timestamp. So `ordered[i + 1]` is always later than `t`. That is the `p2.Ts > p1.Ts` check from the procedure. `bisect_left` stops on the first duplicate. With duplicates, that gives a time span of zero and a divide by zero.
+
+The `i < 0` check is the procedure's `WHERE p1.Id IS NOT NULL`. Each SQL rule became one line of Python.
+
+## What Does Not Map: Null Math
+
+Null handling is where my C# instincts failed. It failed in two different ways.
+
+In C#, `float?` lifts the math operators. A null goes in, and a null comes out:
+
+```csharp
+float? left = null;
+var result = 8f - left;   // null, no exception
+```
+
+In Python, the type hint `float | None` is only a note for the type checker. It does not change runtime behavior:
+
+```python
+8.0 - None   # TypeError
+```
+
+My first null test failed with that `TypeError`. I added an `is None` check before the math. The C# compiler had done that check for me for years. I did not know it until it was gone.
+
+Then pandas did the opposite. pandas stores a missing number as `NaN`. Math with `NaN` does not throw. It returns another `NaN`, with no warning:
+
+```python
+8.0 - float("nan")   # nan
+```
+
+So the same rule has two failure modes. Pure Python fails loud. pandas fails silent. The silent one cost me a bug. A carry-forward value became `NaN`, and nothing told me.
+
+Three smaller items also do not map:
+
+- **Truthiness.** `if value:` is false for `0.0`. A river reading of zero is real data. Use `is None`.
+- **Type hints.** USGS returns readings as strings, such as `"16.73"`. The hint `float` does not stop a string. Convert at the boundary.
+- **Status codes.** A public USACE feed returns HTTP 200 when you hit its rate limit. The body holds the error. `raise_for_status()` passed, and my first run saved 15 error messages as data. `EnsureSuccessStatusCode()` would pass too. Check the body.
+
+## The Port: One Procedure, Two Python Versions
+
+The C# version worked on AIS vessel positions. River gauges have the same problem. Four USGS gauges report on their own clocks, about every 30 minutes. To compare St. Louis with Grafton and Chester, I need one shared 15-minute grid.
+
+The T-SQL version uses two `OUTER APPLY` lookups for each grid time. One finds the reading before. One finds the reading after. Simplified:
+
+```sql
+SELECT i.GridTime,
+       p1.Value + (p2.Value - p1.Value)
+         * DATEDIFF(SECOND, p1.ObservedAt, i.GridTime)
+         / CAST(DATEDIFF(SECOND, p1.ObservedAt, p2.ObservedAt) AS FLOAT) AS Value
+FROM @Grid i
+OUTER APPLY (SELECT TOP 1 * FROM dbo.Reading
+             WHERE ObservedAt <= i.GridTime ORDER BY ObservedAt DESC) p1
+OUTER APPLY (SELECT TOP 1 * FROM dbo.Reading
+             WHERE ObservedAt > i.GridTime ORDER BY ObservedAt ASC) p2
+WHERE p1.Id IS NOT NULL;
+```
+
+I wrote two Python versions. The first is `interpolate_at`, in plain Python with `bisect_right`. The second is `interpolate_frame`, in pandas. Every test runs the same readings through both and compares every value.
+
+### merge_asof Does Not Interpolate
+
+I expected one pandas call to do the whole job. It does not. `merge_asof` is an as-of join. It finds a nearby row. That is all.
+
+So the pandas version needs two joins, the same as the two `OUTER APPLY` blocks:
+
+```python
+left = pd.merge_asof(grid_frame, ordered, left_on="grid_time",
+                     right_on="left_time", by=by, direction="backward")
+right = pd.merge_asof(grid_frame, ordered, left_on="grid_time",
+                      right_on="right_time", by=by, direction="forward",
+                      allow_exact_matches=False)
+```
+
+The backward join is `bisect_right - 1`. The forward join with `allow_exact_matches=False` is `ordered[i + 1]`. The math comes after both joins. My first halfway value was 4.0 instead of 6.0, because I had only the left join.
+
+### by= Is Not PARTITION BY
+
+I read `by="gauge_id"` as `PARTITION BY gauge_id`. I sorted by gauge, then by time. Two gauges gave me this:
+
+```text
+ValueError: right keys must be sorted
+```
+
+`by=` keeps each gauge on its own series. It does not relax the sort. The time column must be in order across the whole frame. A sort by gauge and then time makes the clock go backward at each gauge boundary. The fix was a stable sort on time only:
+
+```python
+ordered = ordered.sort_values("observed_at_utc", kind="mergesort")
+```
+
+The stable sort matters for duplicates too. Equal timestamps stay in input order. That is not the newest revision, so the caller must remove duplicate revisions first. The docstring now says so.
+
+## The Chart Looked Better When It Was Wrong
+
+Both Python versions passed every test. They matched the stored procedure. They also shared its worst bug.
+
+The procedure draws a straight line between any two readings, however far apart. After the last reading, it carries that value forward forever. If a gauge goes offline for two days, you get two days of smooth, invented data.
+
+I wrote the failing test first. One hour into a two-day outage, the code returned about 4.08. Three hours after the final reading, it still returned 8.0. Neither value was real.
+
+The dangerous part: the result looked reasonable. A smooth line across an outage does not look broken on a chart. It looks cleaner than the truth. I have seen this kind of bug in SQL reporting code. The query is valid. The numbers are valid. The business rule is wrong.
+
+The fix is a two-hour limit. The gauges report about every 30 minutes, so two hours is four missed readings:
+
+```python
+MAX_GAP = timedelta(hours=2)
+
+if right.observed_at_utc - left.observed_at_utc > max_gap:
+    found.append((t, None))
+    continue
+```
+
+The same limit applies after the last reading. Now a long outage is an honest gap.
+
+### The Smaller Bugs
+
+The tests found three more problems. All three were mine.
+
+- **`ceil_15` was off by one interval.** It always added 15 minutes, so 10:15 became 10:30. Now it floors first and adds 15 minutes only when the floor is earlier.
+- **Angles took the long way.** A plain average of 355° and 10° is 182.5°. The short arc gives 2.5°. Python's `%` returns a positive result for a negative number, so `(-165) % 360` is 195. That makes the wrap work in one line.
+- **The wrong statistic got in.** The USGS feed can carry a daily mean next to the instantaneous reading. My live script filtered it, but the shared parse function did not. The rule now lives in `transforms.py`, and the silver pipeline uses the same rule.
+
+Some tests never failed. The duplicate test passed on the first run, because the earlier `bisect_right` rule already handled it. That told me something too: one rule can cover the next case.
+
+## Week 1 by the Numbers
+
+| Item | Result |
+| --- | --- |
+| Tests | 48 passing, about 0.64 seconds |
+| Live grid run | 4 gauges, 2 days, 191 shared slots |
+| pandas vs. pure Python | Every cell matched |
+| USGS backfill | 400 days, 8 requests, 16 pages, 140,548 readings |
+| Backfill time and size | 63 seconds, 70 MB raw |
+
+One example from the live run: St. Louis read 12.88 feet at 20:00 UTC and 12.86 feet at 20:30. The 20:15 slot came out at 12.87 feet.
+
+Eight requests did not make eight files. The USGS API returns at most 10,000 readings per page. Each series had about 17,000, so each request needed two pages. One API call is not one file. The landing code has to follow the `next` link until it runs out.
+
+## Next Up: Spark Has No merge_asof
+
+pandas runs on one machine. Next week the data moves to Databricks, and Spark has no `merge_asof`. I will build the as-of join again from window functions. That is where T-SQL should finally pay off.
+
+The lesson from week 1 is simple. The syntax took a day. The rules took the week. Python did not break my code. It removed the safety nets I did not know I had.
+
+Next up, Part 2: a T-SQL to PySpark Rosetta Stone.
