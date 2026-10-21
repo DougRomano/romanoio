@@ -8,13 +8,15 @@ seriesOrder: 1
 image: "/post-images/python-for-the-dotnet-developer.png"
 ---
 
-I live in Kimmswick Missouri, on the Mississippi River. I can see the barges move up and down the river when the weather is right as I type this. I also run a software-defined radio (SDR) at home. It picks up the AIS signals that boats send and the ADS-B signals that planes send that give the vessel information and planned starting and ending locations. The dots on my screen move with the tows I can see outside.
+I live in Kimmswick, Missouri, on the Mississippi River. When the weather is right, I can see barges moving past while I work.
 
-The plane traffic comes from an ADS-B capture on a Raspberry Pi. That feed lands on my Unraid server, where Docker runs Postgres containers that store the tracks. Boats and planes both show up as rows I can query.
+I also run software-defined radios (SDRs) at home. A Raspberry Pi captures AIS broadcasts from boats and ADS-B broadcasts from planes. Those messages include identity, position, direction, speed, and other telemetry. The feeds land on my Unraid server, where Docker containers run Postgres and store the tracks. The dots on my screen often match the traffic I can see outside.
 
-That river is the dataset for this series. Over several weeks I will move from C# and SQL Server to a lakehouse on Azure Databricks, Microsoft Fabric and Microsoft Foundry. I will build it in public, on the river I look at every day.
+That setup gave me the idea for this series, but it is not the lakehouse data source. I wanted a project that anyone could reproduce without access to my radio or home server. The lakehouse uses U.S. government public data: lock traffic and queues from the U.S. Army Corps of Engineers (USACE), river stage and discharge from the U.S. Geological Survey (USGS), and weather from NOAA.
 
-All of the data is public. River gauge readings come from the U.S. Geological Survey (USGS). Lock traffic comes from the U.S. Army Corps of Engineers (USACE). Weather comes from NOAA. There is no client data and no proprietary data. This project is for learning, and anyone can run it.
+The first version covers six locks and four river gauges around St. Louis. The data can answer practical questions: Which locks are backing up? How long are tows waiting? Does river stage affect the delay? Later, I will use the same history to predict queue times.
+
+That public river data is the dataset for this series. Over several weeks I will move from C# and SQL Server to a lakehouse on Azure Databricks, Microsoft Fabric and Microsoft Foundry. I will build it in public, on the river I look at every day. There is no client data and no proprietary data. Anyone can run the project.
 
 Most "Python for C# developers" guides teach syntax. Syntax was not my problem. I can read a `for` loop in any language.
 
